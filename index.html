@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>VoiceMemo AI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+    html,body,#root{height:100%;background:#1C1C1E}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;color:#fff;overflow:hidden}
+    button{-webkit-appearance:none;appearance:none;border:none;background:none;cursor:pointer;color:inherit}
+    input,select,textarea{-webkit-appearance:none;appearance:none;outline:none}
+    select option{background:#2C2C2E;color:#fff}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:4px}
+
+    @keyframes pulse-ring{0%{transform:scale(1);opacity:.4}100%{transform:scale(1.6);opacity:0}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+    /* ① PIN用アニメーション */
+    @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+    @keyframes pinPop{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+    /* ③ 一時停止インジケーター */
+    @keyframes pausePulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+    .fade-up{animation:fadeUp .28s ease-out both}
+    .slide-up{animation:slideUp .28s cubic-bezier(.32,1,.36,1) both}
+    .spin{animation:spin .9s linear infinite}
+    .blink{animation:blink 1s ease-in-out infinite}
+    .shake{animation:shake .5s ease both}
+
+    /* ---- レイアウト ---- */
+    .app-root{width:100%;height:100vh;display:flex;flex-direction:column;background:#1C1C1E;overflow:hidden}
+    .app-header{display:none;background:#111;border-bottom:1px solid rgba(255,255,255,.08);padding:0 28px;height:52px;align-items:center;justify-content:space-between;flex-shrink:0}
+    .app-layout{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .panel{display:flex;flex-direction:column;height:100%;overflow:hidden}
+    .panel-record{flex:1}
+    .panel-history{flex:1;display:none}
+    .panel-record.hidden{display:none}
+    .panel-history.visible{display:flex;flex-direction:column}
+    .tab-bar{display:flex;background:rgba(28,28,30,.97);border-top:1px solid rgba(255,255,255,.09);flex-shrink:0}
+    @media(min-width:768px){
+      .app-header{display:flex}
+      .app-layout{flex-direction:row}
+      .panel-record{width:420px;min-width:420px;flex:none;border-right:1px solid rgba(255,255,255,.07)}
+      .panel-record.hidden{display:flex!important}
+      .panel-history{display:flex!important;flex-direction:column;flex:1}
+      .tab-bar{display:none}
+    }
+
+    /* ---- 共通コンポーネント ---- */
+    .ios-select{background:#2C2C2E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 40px 12px 16px;font-size:16px;width:100%;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+    .text-input{width:100%;background:#2C2C2E;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 14px 12px 36px;font-size:15px;color:#fff}
+    .text-input:disabled{opacity:.45}
+    .scrubber-track{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:rgba(255,255,255,.2);border-radius:4px;outline:none;cursor:pointer}
+    .scrubber-track::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;box-shadow:0 0 4px rgba(0,0,0,.4)}
+    .member-pill{padding:5px 14px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);background:transparent;white-space:nowrap;transition:all .15s;flex-shrink:0}
+    .member-pill.active{background:#0A84FF;border-color:#0A84FF;color:#fff}
+    .history-item{background:#2C2C2E;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.06);width:100%;text-align:left;transition:opacity .2s}
+    .history-item.pending{opacity:.6;border-color:rgba(10,132,255,.3)}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:flex-end;z-index:200}
+    .modal-sheet{width:100%;max-height:92vh;background:#2C2C2E;border-radius:20px 20px 0 0;display:flex;flex-direction:column}
+    @media(min-width:768px){.modal-overlay{align-items:center;justify-content:center;padding:20px}.modal-sheet{max-width:640px;width:100%;border-radius:20px;max-height:84vh}}
+    .rec-btn-wrap{position:relative;display:flex;align-items:center;justify-content:center}
+    .pulse-ring{position:absolute;width:100%;height:100%;border-radius:50%;background:rgba(255,59,48,.3);animation:pulse-ring 1.4s ease-out infinite}
+    .mode-toggle{display:flex;background:rgba(255,255,255,.1);border-radius:10px;padding:2px;gap:2px}
+    .mode-btn{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;color:rgba(255,255,255,.5);transition:all .2s;white-space:nowrap}
+    .mode-btn.active{background:#fff;color:#1C1C1E}
+    .summary-section{border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.08);margin-bottom:10px}
+    .summary-section-header{padding:9px 14px;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.04);width:100%}
+    .summary-section-body{padding:10px 14px 12px;background:#1C1C1E}
+    .summary-item{display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:13px;color:rgba(255,255,255,.75);line-height:1.65}
+    .summary-dot{width:5px;height:5px;border-radius:50%;margin-top:6px;flex-shrink:0}
+    .edit-textarea{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:8px 10px;font-size:13px;color:#fff;line-height:1.65;resize:none;font-family:inherit}
+    .edit-textarea:focus{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.09)}
+    .prev-card{background:rgba(191,90,242,.08);border:1px solid rgba(191,90,242,.2);border-radius:12px;overflow:hidden;margin-bottom:12px}
+    .prev-card-header{padding:9px 14px;display:flex;align-items:center;justify-content:space-between;background:rgba(191,90,242,.1);width:100%}
+    .export-btn{display:flex;align-items:center;gap:10px;width:100%;padding:13px 16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;font-size:14px;color:rgba(255,255,255,.85);transition:background .15s}
+    .export-btn:active{background:rgba(255,255,255,.12)}
+    .error-banner{background:rgba(255,59,48,.15);border:1px solid rgba(255,59,48,.3);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,100,90,1)}
+    .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.05) 75%);background-size:400px 100%;animation:shimmer 1.4s ease-in-out infinite;border-radius:6px}
+
+    /* ① PINスクリーン */
+    .pin-screen{
+      position:fixed;inset:0;background:#1C1C1E;z-index:999;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+    }
+    .pin-dot{
+      width:14px;height:14px;border-radius:50%;
+      border:2px solid rgba(255,255,255,.3);
+      transition:all .15s;
+    }
+    .pin-dot.filled{background:#FF3B30;border-color:#FF3B30;animation:pinPop .15s ease}
+    .pin-dot.error{background:#FF3B30;border-color:#FF3B30}
+    .pin-key{
+      width:72px;height:72px;border-radius:50%;
+      background:rgba(255,255,255,.1);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      font-size:22px;font-weight:400;color:#fff;
+      transition:background .1s;
+      -webkit-user-select:none;user-select:none;
+    }
+    .pin-key:active{background:rgba(255,255,255,.25)}
+    .pin-key-sub{font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;margin-top:1px}
+    .pin-key.del{background:transparent;font-size:20px}
+    .pin-key.empty{background:transparent;pointer-events:none}
+
+    /* ② オフラインバナー */
+    .offline-banner{
+      background:rgba(255,159,10,.15);border-bottom:1px solid rgba(255,159,10,.3);
+      padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:8px;
+      font-size:12px;color:#FF9F0A;flex-shrink:0;
+    }
+
+    /* ③ 一時停止ボタン */
+    .pause-btn{
+      width:56px;height:56px;border-radius:50%;
+      background:rgba(255,255,255,.12);
+      display:flex;align-items:center;justify-content:center;
+      transition:background .15s;
+    }
+    .pause-btn:active{background:rgba(255,255,255,.22)}
+    .paused-indicator{
+      animation:pausePulse 1.5s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+// ================================================================
+// ★ GAS WebApp URL
+const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwC91pYajGGtpATaa2ndoAK_7b3F-p2yLgYdRwbVUyytYiKF1lXJz-naOY7jXC4jasU/exec";
+// ================================================================
+
+// ================================================================
+// ① 認証設定
+// ★ PINコードをここで変更できます
+const CORRECT_PIN = "3150";
+const AUTH_KEY    = "vm_auth_v1"; // sessionStorage キー
+// ================================================================
+
+// ================================================================
+// GAS API 仕様（全エンドポイント）
+// GET  ?action=getMembers                          → { members:[] }
+// GET  ?action=getHistory&limit=20&offset=0        → { records:[], total:N, hasMore:bool }
+// GET  ?action=getLastRecord&member=xxx            → { record:{...}|null }
+// POST { action:"transcribe", member, interviewee, meetingName,
+//        audio(base64), mimeType, duration, date, mode, systemPrompt }
+//   → { id, sections:{sections:[...], _transcript:"..."} }
+// POST { action:"updateRecord", id, sections }     → { success:true }
+//
+// ページネーション実装例（GAS）:
+//   const sheet = SpreadsheetApp.getActive().getSheetByName("records");
+//   const total = sheet.getLastRow() - 1;
+//   const rows  = sheet.getRange(2+offset, 1, Math.min(limit,total-offset), lastCol)
+//                      .getValues().reverse();
+//   return { records:rows.map(toObj), total, hasMore: offset+limit < total };
+//
+// CacheService推奨（GAS側）:
+//   const key = `hist_${offset}_${limit}`;
+//   const hit = CacheService.getScriptCache().get(key);
+//   if(hit) return JSON.parse(hit);
+//   ...取得処理...
+//   CacheService.getScriptCache().put(key, JSON.stringify(result), 60);
+// ================================================================
+
+// ---- フロントエンドキャッシュ ----
+const CACHE = { members:null, prevRecords:new Map() };
+const TTL   = { members:5*60*1000, prevRecord:5*60*1000 };
+function isFresh(e,t){ return e && Date.now()-e.ts<t; }
+const PAGE_SIZE = 20;
+
+// ---- GAS ヘルパー ----
+async function gasGet(p){
+  const r=await fetch(GAS_WEBAPP_URL+"?"+new URLSearchParams(p));
+  if(!r.ok)throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+async function gasPost(b){
+  const r=await fetch(GAS_WEBAPP_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify(b)});
+  if(!r.ok)throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// ---- AIプロンプト ----
+const PROMPTS={
+  interview:{label:"面談",icon:"user-tie",color:"#BF5AF2",badge:{bg:"rgba(191,90,242,.18)",text:"#BF5AF2"},
+    systemPrompt:`あなたは1on1面談の記録アシスタントです。以下の文字起こしから面談記録として重要な情報を構造化して抽出してください。
+【出力形式】{"sections":[{"key":"goal","label":"今日のゴール","emoji":"🎯","items":["..."]},{"key":"voice","label":"本人の声","emoji":"💬","items":["..."]},{"key":"action","label":"アクション","emoji":"✅","items":["..."]},{"key":"follow","label":"フォロー事項","emoji":"📅","items":["..."]}]}
+- 今日のゴール:面談の目的・確認事項 - 本人の声:メンバーが語った課題・悩み（「本人が〜」と明記）- アクション:担当者付きのネクストアクション - フォロー事項:次回面談で確認すべきこと - 各2〜4項目、情報がない場合は["特になし"]`},
+  meeting:{label:"会議",icon:"people-group",color:"#0A84FF",badge:{bg:"rgba(10,132,255,.18)",text:"#0A84FF"},
+    systemPrompt:`あなたは会議の議事録アシスタントです。以下の文字起こしから会議の重要事項を構造化して抽出してください。
+【出力形式】{"sections":[{"key":"decision","label":"決定事項","emoji":"📋","items":["..."]},{"key":"action","label":"アクション","emoji":"⚡","items":["..."]},{"key":"pending","label":"未解決事項","emoji":"❓","items":["..."]},{"key":"next","label":"ネクスト","emoji":"📅","items":["..."]}]}
+- 決定事項:合意・承認された内容 - アクション:ToDo・担当者・期限をセット - 未解決事項:持ち越し・要調査の論点 - ネクスト:次回会議・確認予定 - 各2〜4項目、情報がない場合は["特になし"]`}
+};
+
+// ---- utils ----
+function fmt(s){return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(Math.floor(s%60)).padStart(2,"0")}`;}
+function nowStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`;}
+function copyText(t){try{navigator.clipboard.writeText(t);return true;}catch{return false;}}
+
+// ---- Icon / Badge / 共通UI ----
+function Ic({n,size=16,color,cls="",style:s}){return<i className={`fa-solid fa-${n} ${cls}`} style={{fontSize:size,color,lineHeight:1,...s}} aria-hidden="true"/>;}
+function ModeToggle({mode,onChange,disabled}){
+  return<div className="mode-toggle">{Object.entries(PROMPTS).map(([k,c])=>(
+    <button key={k} className={`mode-btn ${mode===k?"active":""}`} onClick={()=>!disabled&&onChange(k)} style={{opacity:disabled?.6:1}}>
+      <Ic n={c.icon} size={11} style={{marginRight:4}}/>{c.label}
+    </button>
+  ))}</div>;
+}
+function ModeBadge({mode,small}){
+  const c=PROMPTS[mode];if(!c)return null;
+  return<span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:small?10:11,fontWeight:600,background:c.badge.bg,color:c.badge.text,padding:small?"1px 7px":"2px 9px",borderRadius:20}}>
+    <Ic n={c.icon} size={small?9:10} color={c.badge.text}/>{c.label}</span>;
+}
+function ErrorBanner({msg,onRetry,onDismiss}){
+  return<div className="error-banner">
+    <Ic n="circle-exclamation" size={16} color="#FF453A"/>
+    <span style={{flex:1}}>{msg}</span>
+    {onRetry&&<button onClick={onRetry} style={{fontSize:12,color:"#FF6B6B",textDecoration:"underline"}}>再試行</button>}
+    {onDismiss&&<button onClick={onDismiss}><Ic n="xmark" size={14} color="rgba(255,255,255,.4)"/></button>}
+  </div>;
+}
+function SkeletonCard(){return(
+  <div style={{background:"#2C2C2E",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,border:"1px solid rgba(255,255,255,.06)"}}>
+    <div className="skeleton" style={{width:44,height:44,borderRadius:12,flexShrink:0}}/>
+    <div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}>
+      <div className="skeleton" style={{height:12,width:"55%",borderRadius:6}}/>
+      <div className="skeleton" style={{height:10,width:"35%",borderRadius:6}}/>
+      <div className="skeleton" style={{height:11,width:"80%",borderRadius:6}}/>
+    </div>
+  </div>
+);}
+function GasNotConfigured(){return(
+  <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,gap:16,textAlign:"center"}}>
+    <Ic n="plug-circle-exclamation" size={48} color="rgba(255,255,255,.15)"/>
+    <p style={{fontSize:16,fontWeight:600,color:"rgba(255,255,255,.7)"}}>GAS WebApp URLが未設定です</p>
+    <p style={{fontSize:13,color:"rgba(255,255,255,.4)",lineHeight:1.7}}>index.html 先頭の<br/><code style={{color:"#FF9F0A",background:"rgba(255,159,10,.1)",padding:"2px 6px",borderRadius:4}}>GAS_WEBAPP_URL</code><br/>に GAS のデプロイ URL を設定してください</p>
+  </div>
+);}
+
+// ================================================================
+// ① PINスクリーン
+// ================================================================
+const PIN_LABELS = ["","ABC","DEF","GHI","JKL","MNO","PQRS","TUV","WXYZ"];
+function PinScreen({onSuccess}){
+  const [digits, setDigits] = useState([]);
+  const [shake,  setShake]  = useState(false);
+  const [err,    setErr]    = useState(false);
+
+  const add = d => {
+    if(digits.length>=4||shake) return;
+    const next=[...digits,d];
+    setDigits(next);
+    if(next.length===4){
+      if(next.join("")===CORRECT_PIN){
+        sessionStorage.setItem(AUTH_KEY,"1");
+        setTimeout(onSuccess, 150);
+      }else{
+        setErr(true); setShake(true);
+        setTimeout(()=>{ setShake(false); setErr(false); setDigits([]); },700);
+      }
+    }
+  };
+  const del = ()=>{ if(!shake) setDigits(d=>d.slice(0,-1)); };
+
+  return(
+    <div className="pin-screen">
+      {/* ロゴ */}
+      <div style={{marginBottom:40,textAlign:"center"}}>
+        <div style={{width:56,height:56,borderRadius:16,background:"rgba(255,59,48,.2)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}>
+          <Ic n="microphone" size={24} color="#FF3B30"/>
+        </div>
+        <p style={{fontSize:20,fontWeight:700,marginBottom:6}}>VoiceMemo AI</p>
+        <p style={{fontSize:14,color:"rgba(255,255,255,.4)"}}>PINコードを入力してください</p>
+      </div>
+
+      {/* ドット */}
+      <div className={shake?"shake":""} style={{display:"flex",gap:18,marginBottom:48}}>
+        {[0,1,2,3].map(i=>(
+          <div key={i} className={`pin-dot ${digits.length>i?(err?"error":"filled"):""}`}/>
+        ))}
+      </div>
+
+      {/* テンキー */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,72px)",gap:14}}>
+        {[1,2,3,4,5,6,7,8,9].map(n=>(
+          <button key={n} className="pin-key" onClick={()=>add(String(n))}>
+            <span>{n}</span>
+            {PIN_LABELS[n]&&<span className="pin-key-sub">{PIN_LABELS[n]}</span>}
+          </button>
+        ))}
+        <div/>
+        <button className="pin-key" onClick={()=>add("0")}>
+          <span>0</span>
+        </button>
+        <button className="pin-key del" onClick={del}>
+          <Ic n="delete-left" size={20} color="rgba(255,255,255,.7)"/>
+        </button>
+      </div>
+
+      {err&&(
+        <p style={{marginTop:24,fontSize:13,color:"#FF453A"}}>PINコードが違います</p>
+      )}
+    </div>
+  );
+}
+
+// ================================================================
+// ② オフラインバナー（App全体で使用）
+// ================================================================
+function OfflineBanner(){
+  return(
+    <div className="offline-banner">
+      <Ic n="wifi-slash" size={13} color="#FF9F0A"/>
+      <span>オフラインです。ネットワーク接続を確認してください。</span>
+    </div>
+  );
+}
+
+// ================================================================
+// WAVEFORM（③ 一時停止対応）
+// ================================================================
+function Waveform({stream, paused}){
+  const cvRef=useRef(null), rafRef=useRef(null);
+  useEffect(()=>{
+    if(!stream)return;
+    const ac=new(window.AudioContext||window.webkitAudioContext)();
+    const an=ac.createAnalyser(); an.fftSize=256;
+    ac.createMediaStreamSource(stream).connect(an);
+    const cv=cvRef.current, cx=cv.getContext("2d"), dt=new Uint8Array(an.frequencyBinCount);
+    const draw=()=>{
+      rafRef.current=requestAnimationFrame(draw);
+      an.getByteFrequencyData(dt);
+      const W=cv.width, H=cv.height; cx.clearRect(0,0,W,H);
+      const bw=3,gap=2,tot=bw+gap,cnt=Math.floor(W/tot),step=Math.floor(dt.length/cnt);
+      for(let i=0;i<cnt;i++){
+        const v=dt[i*step]/255, h=Math.max(3,v*H*.85);
+        // ③ 一時停止中はグレー
+        cx.fillStyle=paused?`rgba(150,150,150,${.3+v*.3})`:`rgba(255,59,48,${.45+v*.55})`;
+        const y=(H-h)/2;
+        cx.beginPath();
+        if(cx.roundRect)cx.roundRect(i*tot,y,bw,h,1.5);else cx.rect(i*tot,y,bw,h);
+        cx.fill();
+      }
+    };
+    draw();
+    return()=>{cancelAnimationFrame(rafRef.current);ac.close();};
+  },[stream]);
+  return<canvas ref={cvRef} width={320} height={60} style={{width:"100%",maxWidth:320,height:60,display:"block",margin:"0 auto"}}/>;
+}
+
+// ================================================================
+// IOS PLAYER
+// ================================================================
+function IOSPlayer({url,onDelete}){
+  const [playing,setPlaying]=useState(false);
+  const [cur,setCur]=useState(0);
+  const [dur,setDur]=useState(0);
+  const ref=useRef(null);
+  useEffect(()=>{
+    const a=ref.current;if(!a)return;
+    a.addEventListener("timeupdate",()=>setCur(a.currentTime));
+    a.addEventListener("loadedmetadata",()=>setDur(a.duration));
+    a.addEventListener("ended",()=>{setPlaying(false);setCur(0);a.currentTime=0;});
+  },[]);
+  const toggle=()=>{const a=ref.current;if(playing){a.pause();setPlaying(false);}else{a.play();setPlaying(true);}};
+  const skip=s=>{const a=ref.current;a.currentTime=Math.min(Math.max(0,a.currentTime+s),a.duration);};
+  const seek=v=>{ref.current.currentTime=v;setCur(v);};
+  return(
+    <div className="fade-up" style={{background:"#2C2C2E",borderRadius:18,padding:"20px 20px 16px",marginBottom:12}}>
+      <audio ref={ref} src={url} preload="metadata"/>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:10,fontSize:12,color:"rgba(255,255,255,.4)"}}>
+        <span style={{fontVariantNumeric:"tabular-nums"}}>{fmt(cur)}</span>
+        <span style={{fontVariantNumeric:"tabular-nums"}}>-{fmt(Math.max(0,dur-cur))}</span>
+      </div>
+      <input type="range" className="scrubber-track" min={0} max={dur||1} step={0.01} value={cur}
+        onChange={e=>seek(parseFloat(e.target.value))} style={{marginBottom:18}}/>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px"}}>
+        <button onClick={onDelete} style={{width:40,height:40,borderRadius:"50%",background:"rgba(255,59,48,.18)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <Ic n="trash" size={16} color="#FF3B30"/>
+        </button>
+        <button onClick={()=>skip(-15)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <Ic n="rotate-left" size={26} color="rgba(255,255,255,.85)"/>
+          <span style={{fontSize:9,color:"rgba(255,255,255,.4)"}}>15</span>
+        </button>
+        <button onClick={toggle} style={{width:64,height:64,borderRadius:"50%",background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <Ic n={playing?"pause":"play"} size={26} color="#fff" style={playing?{}:{marginLeft:3}}/>
+        </button>
+        <button onClick={()=>skip(15)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+          <Ic n="rotate-right" size={26} color="rgba(255,255,255,.85)"/>
+          <span style={{fontSize:9,color:"rgba(255,255,255,.4)"}}>15</span>
+        </button>
+        <button style={{width:40,height:40,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",opacity:.35}} disabled>
+          <Ic n="share-from-square" size={16} color="#fff"/>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Editable Summary ----
+function EditableSummary({sections:init,mode,recordId,onSaved}){
+  const [sections,setSections]=useState(init);
+  const [editing,setEditing]=useState(false);
+  const [draft,setDraft]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [msg,setMsg]=useState(null);
+  const cfg=PROMPTS[mode]||PROMPTS.meeting;
+  const startEdit=()=>{setDraft(JSON.parse(JSON.stringify(sections)));setEditing(true);setMsg(null);};
+  const cancel=()=>{setDraft(null);setEditing(false);};
+  const updateItem=(si,ii,v)=>{const d=JSON.parse(JSON.stringify(draft));d.sections[si].items[ii]=v;setDraft(d);};
+  const save=async()=>{
+    setSaving(true);
+    try{await gasPost({action:"updateRecord",id:recordId,sections:draft});setSections(draft);setEditing(false);setDraft(null);setMsg("保存しました");if(onSaved)onSaved(draft);setTimeout(()=>setMsg(null),3000);}
+    catch(e){setMsg("保存失敗: "+e.message);}
+    setSaving(false);
+  };
+  const disp=editing?draft:sections;
+  return(
+    <div className="fade-up" style={{marginTop:12}}>
+      {sections._transcript&&<TranscriptAccordion text={sections._transcript}/>}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <span style={{fontSize:12,color:"rgba(255,255,255,.4)",fontWeight:500}}>AI 要約</span>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {msg&&<span style={{fontSize:11,color:msg.includes("失敗")?"#FF453A":"#30D158"}}>{msg}</span>}
+          {recordId&&!editing&&<button onClick={startEdit} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:"rgba(255,255,255,.5)",background:"rgba(255,255,255,.08)",borderRadius:8,padding:"5px 10px"}}><Ic n="pen" size={11}/>編集</button>}
+          {editing&&<div style={{display:"flex",gap:6}}>
+            <button onClick={cancel} style={{fontSize:12,color:"rgba(255,255,255,.5)",background:"rgba(255,255,255,.08)",borderRadius:8,padding:"5px 10px"}}>キャンセル</button>
+            <button onClick={save} disabled={saving} style={{fontSize:12,fontWeight:600,color:"#fff",background:saving?"rgba(10,132,255,.4)":"#0A84FF",borderRadius:8,padding:"5px 12px",display:"flex",alignItems:"center",gap:5}}>
+              {saving?<><Ic n="spinner" size={11} cls="spin"/>保存中</>:<><Ic n="cloud-arrow-up" size={11}/>保存</>}
+            </button>
+          </div>}
+        </div>
+      </div>
+      {(disp?.sections||[]).map((sec,si)=>(
+        <div key={sec.key} className="summary-section">
+          <div className="summary-section-header">
+            <span style={{fontSize:16}}>{sec.emoji}</span>
+            <span style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.9)"}}>{sec.label}</span>
+            {editing&&<span style={{fontSize:11,color:"rgba(255,255,255,.3)",marginLeft:"auto"}}>編集中</span>}
+          </div>
+          <div className="summary-section-body">
+            {sec.items.map((item,ii)=>editing?(
+              <textarea key={ii} className="edit-textarea" value={item} onChange={e=>updateItem(si,ii,e.target.value)}
+                rows={Math.max(1,Math.ceil(item.length/36))} style={{marginBottom:ii<sec.items.length-1?8:0}}/>
+            ):(
+              <div key={ii} className="summary-item">
+                <div className="summary-dot" style={{background:cfg.color}}/><span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+function TranscriptAccordion({text}){
+  const [open,setOpen]=useState(false);
+  return(
+    <div className="summary-section" style={{marginBottom:10}}>
+      <button className="summary-section-header" onClick={()=>setOpen(o=>!o)} style={{justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}><Ic n="file-lines" size={13} color="#0A84FF"/><span style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.9)"}}>文字起こし</span></div>
+        <Ic n={open?"chevron-up":"chevron-down"} size={12} color="rgba(255,255,255,.4)"/>
+      </button>
+      {open&&<div className="summary-section-body"><p style={{fontSize:13,color:"rgba(255,255,255,.65)",lineHeight:1.75,margin:0}}>{text}</p></div>}
+    </div>
+  );
+}
+
+// ---- Prev Record Card ----
+function PrevRecordCard({member}){
+  const [record,setRecord]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [open,setOpen]=useState(true);
+  useEffect(()=>{
+    if(!member){setRecord(null);return;}
+    const cached=CACHE.prevRecords.get(member);
+    if(isFresh(cached,TTL.prevRecord)){setRecord(cached.data);return;}
+    let cancelled=false;
+    (async()=>{
+      setLoading(true);
+      try{const d=await gasGet({action:"getLastRecord",member});if(!cancelled){const r=d.record||null;setRecord(r);CACHE.prevRecords.set(member,{data:r,ts:Date.now()});}}
+      catch{if(!cancelled)setRecord(null);}
+      if(!cancelled)setLoading(false);
+    })();
+    return()=>{cancelled=true;};
+  },[member]);
+  if(loading)return<div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",color:"rgba(255,255,255,.35)",fontSize:13}}><Ic n="spinner" size={13} cls="spin"/>前回の記録を取得中...</div>;
+  const fs=record?.sections?.sections?.find(s=>s.key==="follow");
+  if(!fs?.items?.length)return null;
+  return(
+    <div className="prev-card fade-up">
+      <button className="prev-card-header" onClick={()=>setOpen(o=>!o)}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}><Ic n="clock-rotate-left" size={13} color="#BF5AF2"/><span style={{fontSize:12,fontWeight:700,color:"rgba(191,90,242,.95)"}}>前回のフォロー事項</span><span style={{fontSize:11,color:"rgba(255,255,255,.35)"}}>({record.date?.slice(0,10)})</span></div>
+        <Ic n={open?"chevron-up":"chevron-down"} size={12} color="rgba(191,90,242,.6)"/>
+      </button>
+      {open&&<div style={{padding:"10px 14px 12px"}}>
+        {fs.items.map((item,i)=><div key={i} style={{display:"flex",alignItems:"flex-start",gap:7,padding:"3px 0",fontSize:12,color:"rgba(255,255,255,.7)",lineHeight:1.6}}><span style={{color:"#BF5AF2",marginTop:2,flexShrink:0}}>📅</span><span>{item}</span></div>)}
+      </div>}
+    </div>
+  );
+}
+
+// ---- Export Panel ----
+function ExportPanel({item}){
+  const [copied,setCopied]=useState(null);
+  const buildSummary=()=>{const cfg=PROMPTS[item.mode]||PROMPTS.meeting;const title=item.mode==="meeting"?(item.meetingName||"会議"):`${item.member}${item.interviewee?" → "+item.interviewee:""}`;let lines=[`【${cfg.label}】${title}`,`日時：${item.date}　時間：${item.duration}`,""];(item.sections?.sections||[]).forEach(s=>{lines.push(`${s.emoji} ${s.label}`);s.items.forEach(i=>lines.push(`  ・${i}`));lines.push("");});return lines.join("\n").trim();};
+  const buildFull=()=>{let t=buildSummary();if(item.sections?._transcript)t+=`\n\n【文字起こし】\n${item.sections._transcript}`;return t;};
+  const doCopy=type=>{copyText(type==="summary"?buildSummary():buildFull());setCopied(type);setTimeout(()=>setCopied(null),2500);};
+  const doPrint=()=>{const cfg=PROMPTS[item.mode]||PROMPTS.meeting;const title=item.mode==="meeting"?(item.meetingName||"会議"):`${item.member}${item.interviewee?" / "+item.interviewee:""}`;const sH=(item.sections?.sections||[]).map(s=>`<div class="ps"><div class="pt">${s.emoji} ${s.label}</div>${s.items.map(i=>`<div class="pi">${i}</div>`).join("")}</div>`).join("");const tH=item.sections?._transcript?`<div class="ps"><div class="pt">📝 文字起こし</div><pre class="pT">${item.sections._transcript}</pre></div>`:"";const w=window.open("","_blank");w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${cfg.label}記録 - ${title}</title><style>body{font-family:-apple-system,sans-serif;font-size:11pt;color:#000;margin:20mm 18mm;line-height:1.6}.h{border-bottom:2px solid #333;padding-bottom:10pt;margin-bottom:16pt}.ht{font-size:17pt;font-weight:bold;margin-bottom:5pt}.hm{font-size:10pt;color:#555}.hb{background:#eee;border-radius:4pt;padding:1pt 6pt;font-size:9pt;margin-left:8pt}.ps{margin-bottom:14pt;page-break-inside:avoid}.pt{font-size:12pt;font-weight:bold;margin-bottom:7pt;border-left:3px solid #555;padding-left:8pt}.pi{font-size:11pt;margin-bottom:4pt;padding-left:14pt;position:relative}.pi::before{content:"•";position:absolute;left:4pt}.pT{font-size:10pt;line-height:1.7;color:#333;white-space:pre-wrap;background:#f8f8f8;padding:10pt;border-radius:4pt;font-family:inherit}@media print{@page{margin:20mm 18mm}}</style></head><body><div class="h"><div class="ht">${title}<span class="hb">${cfg.label}</span></div><div class="hm">日時：${item.date}　録音時間：${item.duration}</div></div>${sH}${tH}</body></html>`);w.document.close();w.onload=()=>w.print();};
+  return(
+    <div style={{marginTop:4}}>
+      <p style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:10,fontWeight:500}}>エクスポート</p>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {[
+          {type:"summary",icon:"clipboard",color:"#30D158",bg:"rgba(48,209,88,.15)",label:"要約をコピー",sub:"箇条書きの要約のみ"},
+          {type:"full",icon:"file-lines",color:"#0A84FF",bg:"rgba(10,132,255,.15)",label:"全文をコピー",sub:"要約＋文字起こし全文"},
+        ].map(({type,icon,color,bg,label,sub})=>(
+          <button key={type} className="export-btn" onClick={()=>doCopy(type)}>
+            <div style={{width:34,height:34,borderRadius:10,background:bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic n={copied===type?"check":icon} size={15} color={color}/></div>
+            <div style={{textAlign:"left"}}><p style={{fontSize:13,fontWeight:600,marginBottom:1}}>{copied===type?"コピーしました！":label}</p><p style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>{sub}</p></div>
+          </button>
+        ))}
+        <button className="export-btn" onClick={doPrint}>
+          <div style={{width:34,height:34,borderRadius:10,background:"rgba(255,159,10,.15)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic n="print" size={15} color="#FF9F0A"/></div>
+          <div style={{textAlign:"left"}}><p style={{fontSize:13,fontWeight:600,marginBottom:1}}>PDFで保存</p><p style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>印刷ダイアログ → PDFに保存</p></div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ================================================================
+// RECORD PANEL（③ 一時停止・再開 + ② エラー回復対応）
+// ================================================================
+function RecordPanel({members,membersLoading,membersError,onRecordSaved,mode,onModeChange,isOnline}){
+  const [member,      setMember]      = useState("");
+  const [interviewee, setInterviewee] = useState("");
+  const [meetingName, setMeetingName] = useState("");
+  // ③ recState に "paused" を追加
+  const [recState,    setRecState]    = useState("idle"); // idle|recording|paused|stopped
+  const [timer,       setTimer]       = useState(0);
+  const [audioURL,    setAudioURL]    = useState(null);
+  const [stream,      setStream]      = useState(null);
+  const [processing,  setProcessing]  = useState(false);
+  const [resultData,  setResultData]  = useState(null);
+  const [saved,       setSaved]       = useState(false);
+  const [showDelete,  setShowDelete]  = useState(false);
+  const [error,       setError]       = useState(null);
+  // ② 再送信用フラグ
+  const [retryReady,  setRetryReady]  = useState(false);
+
+  const mrRef=useRef(null), chunksRef=useRef([]), timerRef=useRef(null);
+  const savedTimer=useRef(0), savedDate=useRef("");
+
+  // ③ タイマー：recording のみカウント（paused では停止）
+  useEffect(()=>{
+    if(recState==="recording") timerRef.current=setInterval(()=>setTimer(t=>t+1),1000);
+    else clearInterval(timerRef.current);
+    return()=>clearInterval(timerRef.current);
+  },[recState]);
+
+  const startRec=async()=>{
+    if(mode==="interview"&&!member)return;
+    if(!isOnline){setError("オフラインです。ネットワーク接続を確認してください。");return;}
+    setError(null); setRetryReady(false);
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr=new MediaRecorder(s);
+      chunksRef.current=[];
+      mr.ondataavailable=e=>e.data.size>0&&chunksRef.current.push(e.data);
+      mr.onstop=()=>{
+        setAudioURL(URL.createObjectURL(new Blob(chunksRef.current,{type:"audio/webm"})));
+        s.getTracks().forEach(t=>t.stop()); setStream(null);
+      };
+      mr.start(100); // 100ms ごとにデータを分割取得（一時停止精度向上）
+      mrRef.current=mr; setStream(s);
+      setRecState("recording"); setTimer(0);
+      setResultData(null); setSaved(false); setAudioURL(null); savedTimer.current=0;
+    }catch{alert("マイクへのアクセスを許可してください。\n設定 → Safari/Chrome → マイク からアクセスを許可できます。");}
+  };
+
+  const stopRec=()=>{
+    savedTimer.current=timer;
+    savedDate.current=nowStr();
+    mrRef.current?.stop();
+    setRecState("stopped");
+  };
+
+  // ③ 一時停止
+  const pauseRec=()=>{
+    mrRef.current?.pause();
+    setRecState("paused");
+  };
+
+  // ③ 再開
+  const resumeRec=()=>{
+    mrRef.current?.resume();
+    setRecState("recording");
+  };
+
+  const deleteRec=()=>{
+    setAudioURL(null); setResultData(null); setSaved(false);
+    setRecState("idle"); setTimer(0); setShowDelete(false);
+    setError(null); setRetryReady(false);
+    chunksRef.current=[];
+  };
+
+  // ② processAudio: 失敗時も chunksRef を保持して再送信可能にする
+  const processAudio=async()=>{
+    if(!isOnline){setError("オフラインです。接続が回復してから再試行してください。");return;}
+    setProcessing(true); setError(null); setRetryReady(false);
+    const elapsed=savedTimer.current||timer;
+    const cfg=PROMPTS[mode];
+    try{
+      // chunksRef.current は失敗しても保持されているので再送信可能
+      const blob=new Blob(chunksRef.current,{type:"audio/webm"});
+      if(blob.size===0)throw new Error("音声データがありません。再録音してください。");
+      const b64=await new Promise(res=>{
+        const r=new FileReader();
+        r.onloadend=()=>res(r.result.split(",")[1]);
+        r.readAsDataURL(blob);
+      });
+      const data=await gasPost({
+        action:"transcribe",
+        member:member||"", interviewee:interviewee||"", meetingName:meetingName||"",
+        audio:b64, mimeType:"audio/webm",
+        duration:fmt(elapsed), date:savedDate.current,
+        mode, systemPrompt:cfg.systemPrompt
+      });
+      setResultData({id:data.id,sections:data.sections});
+      setSaved(true);
+      // 楽観的UI更新
+      onRecordSaved({
+        id:data.id, date:savedDate.current, duration:fmt(elapsed),
+        member:member||"", interviewee:interviewee||"",
+        meetingName:meetingName||"", mode, sections:data.sections,
+        _optimistic:true
+      });
+      if(mode==="interview"&&member) CACHE.prevRecords.delete(member);
+    }catch(err){
+      setError(err.message);
+      setRetryReady(true); // ② 音声データを保持して再送信ボタンを表示
+    }
+    setProcessing(false);
+  };
+
+  const isRec    = recState==="recording";
+  const isPaused = recState==="paused";
+  const isStopped= recState==="stopped";
+  const isActive = isRec||isPaused;
+  const cfg      = PROMPTS[mode];
+  const canRecord= mode==="meeting"||!!member;
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",padding:"0 0 20px"}}>
+      <div style={{padding:"14px 20px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+        <span style={{fontSize:13,fontWeight:600,color:"rgba(255,255,255,.4)"}}>録音</span>
+        <ModeToggle mode={mode} onChange={onModeChange} disabled={isActive}/>
+      </div>
+
+      <div style={{padding:"0 20px 14px",flexShrink:0}}>
+        {mode==="interview"?(
+          <>
+            {membersLoading?<div style={{height:46,display:"flex",alignItems:"center",gap:8,color:"rgba(255,255,255,.4)",fontSize:14}}><Ic n="spinner" size={14} cls="spin"/>読み込み中...</div>
+            :membersError?<div style={{fontSize:13,color:"#FF453A",padding:"12px 0"}}>{membersError}</div>
+            :(
+              <select className="ios-select" value={member}
+                onChange={e=>{setMember(e.target.value);setRecState("idle");setAudioURL(null);setResultData(null);setSaved(false);}}
+                disabled={isActive}>
+                <option value="">面談者を選択...</option>
+                {members.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+            )}
+            <div style={{marginTop:10,position:"relative"}}>
+              <Ic n="user" size={14} color="rgba(255,255,255,.3)" style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/>
+              <input type="text" value={interviewee} onChange={e=>setInterviewee(e.target.value)}
+                placeholder="面談相手の名前（任意）" disabled={isActive} className="text-input"/>
+            </div>
+          </>
+        ):(
+          <div style={{position:"relative"}}>
+            <Ic n="people-group" size={14} color="rgba(255,255,255,.3)" style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/>
+            <input type="text" value={meetingName} onChange={e=>setMeetingName(e.target.value)}
+              placeholder="会議名（任意）" disabled={isActive} className="text-input"/>
+          </div>
+        )}
+      </div>
+
+      <div style={{flex:1,padding:"0 20px",overflowY:"auto",display:"flex",flexDirection:"column",justifyContent:(!isStopped)?"center":"flex-start"}}>
+        {recState==="idle"&&mode==="interview"&&member&&<PrevRecordCard member={member}/>}
+
+        {recState==="idle"&&(
+          <div className="fade-up" style={{textAlign:"center"}}>
+            <div style={{fontSize:44,marginBottom:12,opacity:.1}}>🎙</div>
+            <p style={{color:"rgba(255,255,255,.28)",fontSize:14,lineHeight:1.7}}>
+              {mode==="meeting"?(meetingName||"会議モードで録音を開始します"):(member?"面談モードで録音を開始します":"まずメンバーを選択してください")}
+            </p>
+          </div>
+        )}
+
+        {isActive&&(
+          <div className="fade-up" style={{textAlign:"center"}}>
+            <div style={{fontSize:50,fontWeight:200,letterSpacing:2,fontVariantNumeric:"tabular-nums",marginBottom:20,color:"#fff"}}>{fmt(timer)}</div>
+            <Waveform stream={stream} paused={isPaused}/>
+            <div style={{marginTop:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
+              {isPaused
+                ?<span className="paused-indicator" style={{fontSize:13,color:"rgba(255,200,0,.9)"}}>⏸ 一時停止中</span>
+                :<span className="blink" style={{fontSize:13,color:"rgba(255,59,48,.9)"}}>録音中</span>
+              }
+              <span style={{fontSize:12,color:"rgba(255,255,255,.4)"}}>·</span>
+              {mode==="meeting"
+                ?<span style={{fontSize:12,color:"rgba(255,255,255,.7)",fontWeight:600}}>{meetingName||"会議"}</span>
+                :<><span style={{fontSize:12,color:"rgba(255,255,255,.5)"}}>{member}</span>{interviewee&&<><span style={{fontSize:12,color:"rgba(255,255,255,.3)"}}>→</span><span style={{fontSize:12,color:"rgba(191,90,242,.8)"}}>{interviewee}</span></>}</>
+              }
+              <ModeBadge mode={mode} small/>
+            </div>
+          </div>
+        )}
+
+        {isStopped&&audioURL&&(
+          <div style={{paddingTop:4}}>
+            <div style={{marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                  {mode==="meeting"
+                    ?<p style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,.9)"}}>{meetingName||"（会議名未入力）"}</p>
+                    :<><p style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,.9)"}}>{member}</p>{interviewee&&<><span style={{fontSize:13,color:"rgba(255,255,255,.3)"}}>→</span><p style={{fontSize:13,fontWeight:600,color:"rgba(191,90,242,.9)"}}>{interviewee}</p></>}</>
+                  }
+                </div>
+                <p style={{fontSize:11,color:"rgba(255,255,255,.38)"}}>{savedDate.current} · {fmt(savedTimer.current||timer)}</p>
+              </div>
+              <ModeBadge mode={mode}/>
+            </div>
+
+            {/* ② エラー時：再送信ボタン付きバナー */}
+            {error&&(
+              <div className="error-banner" style={{flexDirection:"column",alignItems:"stretch",gap:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <Ic n="circle-exclamation" size={16} color="#FF453A"/>
+                  <span style={{flex:1,fontSize:13}}>{error}</span>
+                  <button onClick={()=>{setError(null);setRetryReady(false);}} style={{padding:2}}><Ic n="xmark" size={14} color="rgba(255,255,255,.4)"/></button>
+                </div>
+                {retryReady&&(
+                  <button onClick={processAudio} disabled={!isOnline}
+                    style={{width:"100%",padding:"10px 0",borderRadius:10,background:isOnline?"rgba(255,59,48,.25)":"rgba(255,255,255,.08)",fontSize:13,fontWeight:600,color:isOnline?"#FF6B6B":"rgba(255,255,255,.3)",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                    <Ic n="rotate-right" size={13} color={isOnline?"#FF6B6B":"rgba(255,255,255,.3)"}/>
+                    {isOnline?"音声データを再送信する":"オフライン：接続回復後に再試行できます"}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {!showDelete&&<IOSPlayer url={audioURL} onDelete={()=>setShowDelete(true)}/>}
+            {showDelete&&(
+              <div className="fade-up" style={{background:"#3A3A3C",borderRadius:14,padding:20,marginBottom:12,textAlign:"center"}}>
+                <p style={{fontSize:15,fontWeight:500,marginBottom:6}}>録音を削除しますか？</p>
+                <p style={{fontSize:13,color:"rgba(255,255,255,.45)",marginBottom:18}}>この操作は取り消せません</p>
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={()=>setShowDelete(false)} style={{flex:1,padding:"11px 0",borderRadius:10,background:"rgba(255,255,255,.1)",fontSize:15,color:"#fff"}}>キャンセル</button>
+                  <button onClick={deleteRec} style={{flex:1,padding:"11px 0",borderRadius:10,background:"#FF3B30",fontSize:15,fontWeight:600,color:"#fff"}}>削除</button>
+                </div>
+              </div>
+            )}
+
+            {!showDelete&&!saved&&!error&&(
+              <button onClick={processAudio} disabled={processing}
+                style={{width:"100%",padding:"14px 0",borderRadius:14,background:processing?"rgba(10,132,255,.4)":"#0A84FF",fontSize:15,fontWeight:600,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",gap:9}}>
+                {processing?<><Ic n="spinner" size={16} color="#fff" cls="spin"/>AI処理中 ({cfg.label}モード)...</>:<><Ic n="wand-magic-sparkles" size={16} color="#fff"/>Geminiで文字起こし＆要約</>}
+              </button>
+            )}
+            {saved&&<div className="fade-up" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"8px 0"}}><Ic n="circle-check" size={15} color="#30D158"/><span style={{fontSize:13,color:"#30D158"}}>スプレッドシートに保存されました</span></div>}
+            {resultData&&<EditableSummary sections={resultData.sections} mode={mode} recordId={resultData.id}/>}
+          </div>
+        )}
+      </div>
+
+      {/* 録音ボタンエリア（③ 一時停止ボタンを追加） */}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,paddingTop:12,flexShrink:0}}>
+        {isStopped&&(
+          <button onClick={()=>{setRecState("idle");setAudioURL(null);setResultData(null);setSaved(false);setTimer(0);setError(null);setRetryReady(false);chunksRef.current=[];}}
+            style={{fontSize:13,color:"rgba(255,255,255,.45)",padding:"4px 0"}}>新しく録音する</button>
+        )}
+
+        <div style={{display:"flex",alignItems:"center",gap:20}}>
+          {/* ③ 一時停止ボタン（録音中のみ表示） */}
+          <div style={{width:56,opacity:isRec?1:0,transition:"opacity .2s",pointerEvents:isRec?"auto":"none"}}>
+            <button className="pause-btn" onClick={pauseRec}>
+              <Ic n="pause" size={20} color="rgba(255,255,255,.8)"/>
+            </button>
+          </div>
+
+          {/* メイン録音ボタン */}
+          <div className="rec-btn-wrap" style={{width:88,height:88}}>
+            {isRec&&<div className="pulse-ring"/>}
+            <button
+              onClick={isActive?stopRec:startRec}
+              disabled={!canRecord&&!isActive}
+              style={{width:88,height:88,position:"relative",zIndex:1,
+                borderRadius:isActive?"24px":"50%",
+                background:(!canRecord&&!isActive)?"rgba(255,59,48,.28)":"#FF3B30",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                boxShadow:isActive?"none":"0 6px 24px rgba(255,59,48,.42)",
+                transition:"border-radius .35s cubic-bezier(.34,1.56,.64,1), box-shadow .3s",
+                border:isActive?"none":"3.5px solid rgba(255,255,255,.22)"}}>
+              {isActive
+                ?<div style={{width:26,height:26,borderRadius:5,background:"#fff"}}/>
+                :<Ic n="microphone" size={30} color="rgba(255,255,255,.95)"/>
+              }
+            </button>
+          </div>
+
+          {/* ③ 再開ボタン（一時停止中のみ表示） */}
+          <div style={{width:56,opacity:isPaused?1:0,transition:"opacity .2s",pointerEvents:isPaused?"auto":"none"}}>
+            <button className="pause-btn" onClick={resumeRec} style={{background:"rgba(48,209,88,.2)"}}>
+              <Ic n="play" size={18} color="#30D158" style={{marginLeft:2}}/>
+            </button>
+          </div>
+        </div>
+
+        <span style={{fontSize:11,color:"rgba(255,255,255,.28)",letterSpacing:.5}}>
+          {isRec?"一時停止または停止":isPaused?"再開または停止":isStopped?"":"タップして録音"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ================================================================
+// HISTORY PANEL
+// ================================================================
+function HistoryPanel({members,mode,onModeChange,newRecord}){
+  const [records,setRecords]=useState([]);
+  const [total,setTotal]=useState(0);
+  const [hasMore,setHasMore]=useState(false);
+  const [initLoad,setInitLoad]=useState(true);
+  const [moreLoad,setMoreLoad]=useState(false);
+  const [error,setError]=useState(null);
+  const [q,setQ]=useState("");
+  const [filterMem,setFilterMem]=useState("ALL");
+  const [filterMode,setFilterMode]=useState("ALL");
+  const [selected,setSelected]=useState(null);
+  const offsetRef=useRef(0), sentinelRef=useRef(null);
+
+  const fetchFirst=useCallback(async(silent=false)=>{
+    if(!silent)setInitLoad(true);setError(null);
+    try{
+      const d=await gasGet({action:"getHistory",limit:PAGE_SIZE,offset:0});
+      setRecords(d.records||[]);setTotal(d.total||0);setHasMore(d.hasMore||false);offsetRef.current=PAGE_SIZE;
+    }catch(e){setError("履歴の取得に失敗しました: "+e.message);}
+    setInitLoad(false);
+  },[]);
+
+  const fetchMore=async()=>{
+    if(moreLoad||!hasMore)return;setMoreLoad(true);
+    try{
+      const d=await gasGet({action:"getHistory",limit:PAGE_SIZE,offset:offsetRef.current});
+      setRecords(prev=>{const ids=new Set(prev.map(r=>r.id));return [...prev,...(d.records||[]).filter(r=>!ids.has(r.id))];});
+      setTotal(d.total||0);setHasMore(d.hasMore||false);offsetRef.current+=PAGE_SIZE;
+    }catch(e){setError("追加取得に失敗: "+e.message);}
+    setMoreLoad(false);
+  };
+
+  useEffect(()=>{
+    if(!newRecord)return;
+    setRecords(prev=>{const ex=prev.find(r=>r.id===newRecord.id);return ex?prev.map(r=>r.id===newRecord.id?{...newRecord,_optimistic:false}:r):[{...newRecord},...prev];});
+    setTotal(t=>t+1);
+  },[newRecord]);
+
+  useEffect(()=>{fetchFirst();},[fetchFirst]);
+
+  useEffect(()=>{
+    if(!sentinelRef.current)return;
+    const ob=new IntersectionObserver(entries=>{if(entries[0].isIntersecting&&hasMore&&!moreLoad)fetchMore();},{rootMargin:"100px"});
+    ob.observe(sentinelRef.current);
+    return()=>ob.disconnect();
+  },[hasMore,moreLoad]);
+
+  const handleSaved=newSecs=>{setSelected(s=>({...s,sections:newSecs}));setRecords(rs=>rs.map(r=>r.id===selected?.id?{...r,sections:newSecs}:r));};
+
+  const filtered=records.filter(item=>{
+    return (filterMem==="ALL"||item.member===filterMem)
+      &&(filterMode==="ALL"||item.mode===filterMode)
+      &&(!q||(item.sections?._transcript||"").includes(q)||(item.sections?.sections||[]).some(s=>s.items.some(i=>i.includes(q)))||(item.member||"").includes(q)||(item.interviewee||"").includes(q)||(item.meetingName||"").includes(q));
+  });
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+      <div style={{padding:"14px 20px 0",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <h2 style={{fontSize:20,fontWeight:700}}>録音履歴</h2>
+            {!initLoad&&total>0&&<span style={{fontSize:12,color:"rgba(255,255,255,.3)",background:"rgba(255,255,255,.07)",padding:"2px 8px",borderRadius:12}}>全{total}件</span>}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <ModeToggle mode={mode} onChange={onModeChange}/>
+            <button onClick={()=>fetchFirst()} disabled={initLoad} style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <Ic n="rotate-right" size={14} color="rgba(255,255,255,.5)" cls={initLoad?"spin":""}/>
+            </button>
+          </div>
+        </div>
+        <div style={{position:"relative",marginBottom:12}}>
+          <Ic n="magnifying-glass" size={14} color="rgba(255,255,255,.35)" style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}/>
+          <input type="text" value={q} onChange={e=>setQ(e.target.value)} placeholder="キーワード・名前・会議名で検索..."
+            style={{width:"100%",background:"#2C2C2E",border:"1px solid rgba(255,255,255,.1)",borderRadius:12,padding:"10px 36px",fontSize:14,color:"#fff"}}/>
+          {q&&<button onClick={()=>setQ("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",padding:2}}><Ic n="xmark" size={14} color="rgba(255,255,255,.4)"/></button>}
+        </div>
+        <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:10}}>
+          <button className={`member-pill ${filterMem==="ALL"?"active":""}`} onClick={()=>setFilterMem("ALL")}>全員</button>
+          {members.map(m=><button key={m} className={`member-pill ${filterMem===m?"active":""}`} onClick={()=>setFilterMem(m)}>{m.split(" ")[0]}</button>)}
+        </div>
+        <div style={{display:"flex",gap:8,paddingBottom:12}}>
+          <button className={`member-pill ${filterMode==="ALL"?"active":""}`} onClick={()=>setFilterMode("ALL")}
+            style={filterMode==="ALL"?{background:"#0A84FF",borderColor:"#0A84FF",color:"#fff"}:{}}>すべて</button>
+          {Object.entries(PROMPTS).map(([k,c])=>(
+            <button key={k} onClick={()=>setFilterMode(k)}
+              style={{padding:"5px 14px",borderRadius:20,fontSize:13,fontWeight:600,
+                border:`1px solid ${filterMode===k?c.color:"rgba(255,255,255,.15)"}`,
+                background:filterMode===k?c.badge.bg:"transparent",color:filterMode===k?c.color:"rgba(255,255,255,.6)",
+                display:"flex",alignItems:"center",gap:5,flexShrink:0,transition:"all .15s"}}>
+              <Ic n={c.icon} size={11}/>{c.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{flex:1,overflowY:"auto",padding:"0 20px 24px"}}>
+        {error&&<ErrorBanner msg={error} onRetry={()=>fetchFirst()}/>}
+        {initLoad&&<div style={{display:"flex",flexDirection:"column",gap:10}}>{[1,2,3,4,5].map(i=><SkeletonCard key={i}/>)}</div>}
+        {!initLoad&&!error&&filtered.length===0&&(
+          <div style={{textAlign:"center",paddingTop:60,color:"rgba(255,255,255,.25)"}}>
+            <Ic n={q?"magnifying-glass":"microphone"} size={36} color="rgba(255,255,255,.1)" style={{marginBottom:12,display:"block"}}/>
+            <p style={{fontSize:14}}>{records.length===0?"まだ記録がありません":"該当する記録がありません"}</p>
+          </div>
+        )}
+        {!initLoad&&filtered.length>0&&(
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {filtered.map(item=>{
+              const c=PROMPTS[item.mode]||PROMPTS.meeting;
+              const fs=item.sections?.sections?.[0];
+              return(
+                <button key={item.id} className={`history-item ${item._optimistic?"pending":""}`} onClick={()=>setSelected(item)}>
+                  <div style={{width:44,height:44,borderRadius:12,background:c.badge.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <Ic n={c.icon} size={19} color={c.color}/>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                      {item.mode==="meeting"
+                        ?<span style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.9)"}}>{item.meetingName||"（会議名未入力）"}</span>
+                        :<><span style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.9)"}}>{item.member}</span>{item.interviewee&&<><span style={{fontSize:12,color:"rgba(255,255,255,.3)"}}>→</span><span style={{fontSize:12,fontWeight:600,color:"rgba(191,90,242,.85)"}}>{item.interviewee}</span></>}</>
+                      }
+                      <ModeBadge mode={item.mode} small/>
+                      <span style={{fontSize:10,color:"rgba(255,255,255,.3)",background:"rgba(255,255,255,.06)",padding:"1px 6px",borderRadius:4,flexShrink:0,marginLeft:"auto"}}>{item.duration}</span>
+                    </div>
+                    <p style={{fontSize:11,color:"rgba(255,255,255,.35)",marginBottom:4}}>{item.date}</p>
+                    {fs&&<p style={{fontSize:12,color:"rgba(255,255,255,.65)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{fs.emoji} {fs.items[0]}</p>}
+                  </div>
+                  <Ic n="chevron-right" size={14} color="rgba(255,255,255,.18)" style={{flexShrink:0}}/>
+                </button>
+              );
+            })}
+            <div ref={sentinelRef} style={{height:1}}/>
+            {moreLoad&&<div style={{display:"flex",justifyContent:"center",padding:"16px 0",gap:8,color:"rgba(255,255,255,.4)",fontSize:13}}><Ic n="spinner" size={14} cls="spin"/>読み込み中...</div>}
+            {!hasMore&&records.length>0&&!q&&<p style={{textAlign:"center",fontSize:12,color:"rgba(255,255,255,.2)",padding:"12px 0"}}>全{total}件を表示しています</p>}
+          </div>
+        )}
+      </div>
+
+      {selected&&(
+        <div className="modal-overlay" onClick={()=>setSelected(null)}>
+          <div className="modal-sheet slide-up" onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"center",padding:"10px 0 0"}}><div style={{width:36,height:4,borderRadius:4,background:"rgba(255,255,255,.18)"}}/></div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px 10px"}}>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  {selected.mode==="meeting"
+                    ?<p style={{fontSize:16,fontWeight:700}}>{selected.meetingName||"（会議名未入力）"}</p>
+                    :<><p style={{fontSize:16,fontWeight:700}}>{selected.member}</p>{selected.interviewee&&<><span style={{fontSize:14,color:"rgba(255,255,255,.3)"}}>→</span><p style={{fontSize:15,fontWeight:600,color:"rgba(191,90,242,.9)"}}>{selected.interviewee}</p></>}</>
+                  }
+                  <ModeBadge mode={selected.mode}/>
+                </div>
+                <p style={{fontSize:11,color:"rgba(255,255,255,.38)"}}><Ic n="clock" size={10} style={{verticalAlign:"-1px",marginRight:4}}/>{selected.date} · {selected.duration}</p>
+              </div>
+              <button onClick={()=>setSelected(null)} style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,.1)",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic n="xmark" size={15} color="rgba(255,255,255,.7)"/></button>
+            </div>
+            <div style={{overflowY:"auto",padding:"0 20px 40px",flex:1}}>
+              {selected.sections&&<EditableSummary sections={selected.sections} mode={selected.mode} recordId={selected.id} onSaved={handleSaved}/>}
+              <div style={{borderTop:"1px solid rgba(255,255,255,.08)",margin:"16px 0"}}/>
+              <ExportPanel item={selected}/>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ================================================================
+// APP ROOT（① PIN認証 + ② オフライン検知 統合）
+// ================================================================
+function App(){
+  const [authed,   setAuthed]   = useState(()=>sessionStorage.getItem(AUTH_KEY)==="1");
+  const [tab,      setTab]      = useState("record");
+  const [mode,     setMode]     = useState("interview");
+  const [members,  setMembers]  = useState([]);
+  const [membersLoading,setMembersLoading]=useState(true);
+  const [membersError,  setMembersError  ]=useState(null);
+  const [newRecord,setNewRecord]=useState(null);
+  // ② オフライン状態
+  const [isOnline, setIsOnline] = useState(()=>navigator.onLine);
+
+  // ② オンライン/オフラインイベントリスナー
+  useEffect(()=>{
+    const on=()=>setIsOnline(true);
+    const off=()=>setIsOnline(false);
+    window.addEventListener("online",on);
+    window.addEventListener("offline",off);
+    return()=>{window.removeEventListener("online",on);window.removeEventListener("offline",off);};
+  },[]);
+
+  useEffect(()=>{
+    if(!authed||!GAS_WEBAPP_URL)return;
+    (async()=>{
+      setMembersLoading(true);setMembersError(null);
+      if(isFresh(CACHE.members,TTL.members)){setMembers(CACHE.members.data);setMembersLoading(false);return;}
+      try{const d=await gasGet({action:"getMembers"});const l=d.members||[];setMembers(l);CACHE.members={data:l,ts:Date.now()};}
+      catch(){setMembersError("メンバーの取得に失敗しました");}
+      setMembersLoading(false);
+    })();
+  },[authed]);
+
+  const onRecordSaved=useCallback(record=>{
+    setNewRecord({...record,_ts:Date.now()});
+    setTab("history");
+  },[]);
+
+  // ① 未認証時はPINスクリーンを表示
+  if(!authed) return<PinScreen onSuccess={()=>setAuthed(true)}/>;
+
+  if(!GAS_WEBAPP_URL) return<div className="app-root"><div style={{flex:1,display:"flex"}}><GasNotConfigured/></div></div>;
+
+  return(
+    <div className="app-root">
+      {/* ② オフラインバナー（全画面上部） */}
+      {!isOnline&&<OfflineBanner/>}
+
+      <div className="app-header">
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:28,height:28,borderRadius:8,background:"rgba(255,59,48,.2)",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic n="microphone" size={14} color="#FF3B30"/></div>
+          <span style={{fontSize:15,fontWeight:700,color:"rgba(255,255,255,.9)"}}>VoiceMemo AI</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          {!isOnline&&<Ic n="wifi-slash" size={14} color="#FF9F0A"/>}
+          <button onClick={()=>{sessionStorage.removeItem(AUTH_KEY);setAuthed(false);}}
+            
+            style={{fontSize:12,color:"rgba(255,255,255,.35)",display:"flex",alignItems:"center",gap:5}}>
+            <Ic n="lock" size={11} color="rgba(255,255,255,.35)"/>ロック
+          </button>
+        </div>
+      </div>
+
+      <div className="app-layout">
+        <div className={`panel panel-record ${tab!=="record"?"hidden":""}`}>
+          <RecordPanel
+            members={members} membersLoading={membersLoading} membersError={membersError}
+            onRecordSaved={onRecordSaved} mode={mode} onModeChange={setMode} isOnline={isOnline}
+          />
+        </div>
+        <div className={`panel panel-history ${tab==="history"?"visible":""}`}>
+          <HistoryPanel members={members} mode={mode} onModeChange={setMode} newRecord={newRecord}/>
+        </div>
+      </div>
+
+      <div className="tab-bar">
+        {[["record","microphone","録音"],["history","clock-rotate-left","履歴"]].map(([k,icon,label])=>(
+          <button key={k} onClick={()=>setTab(k)}
+            style={{flex:1,padding:"10px 0 16px",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+            <Ic n={icon} size={22} color={tab===k?"#FF3B30":"rgba(255,255,255,.3)"}/>
+            <span style={{fontSize:10,color:tab===k?"#FF3B30":"rgba(255,255,255,.3)",fontWeight:tab===k?600:400}}>{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
