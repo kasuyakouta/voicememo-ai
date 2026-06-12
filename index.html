@@ -10,31 +10,12 @@
     button{-webkit-appearance:none;appearance:none;border:none;background:none;cursor:pointer;color:inherit}
     input,select,textarea{-webkit-appearance:none;appearance:none;outline:none;font-family:inherit}
     select option{background:#fff;color:#1C1C1E}
-    ::-webkit-scrollbar{width:4px}
-    ::-webkit-scrollbar-track{background:transparent}
-    ::-webkit-scrollbar-thumb{background:rgba(60,60,67,.2);border-radius:4px}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(60,60,67,.2);border-radius:4px}
     input[type=range]{-webkit-appearance:none;appearance:none;outline:none}
     input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;box-shadow:0 0 3px rgba(0,0,0,.25)}
-
-    /* ★ 核心：#root を position:fixed で画面全体に固定
-         これによりドキュメントスクロールを完全に封じる */
-    html, body { height: 100%; background: #F2F2F7; overflow: hidden; }
-    #root {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      overflow: hidden;
-      background: #F2F2F7;
-    }
-    /* PC: 中央寄せ */
-    @media (min-width: 768px) {
-      #root > div {
-        max-width: 430px;
-        margin: 0 auto;
-        box-shadow: 0 0 40px rgba(0,0,0,.12);
-        height: 100%;
-      }
-    }
-
+    html,body{height:100%;background:#F2F2F7;overflow:hidden}
+    #root{position:fixed;top:0;left:0;right:0;bottom:0;overflow:hidden;background:#F2F2F7}
+    @media(min-width:768px){#root>div{max-width:430px;margin:0 auto;box-shadow:0 0 40px rgba(0,0,0,.12);height:100%}}
     @keyframes pulse-ring{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.55);opacity:0}}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
@@ -379,6 +360,8 @@ const SVG_ICONS = {
   "wand-magic-sparkles": ["0 0 576 512", "<path d=\"M263.4-27L278.2 9.8 315 24.6c3 1.2 5 4.2 5 7.4s-2 6.2-5 7.4L278.2 54.2 263.4 91c-1.2 3-4.2 5-7.4 5s-6.2-2-7.4-5L233.8 54.2 197 39.4c-3-1.2-5-4.2-5-7.4s2-6.2 5-7.4L233.8 9.8 248.6-27c1.2-3 4.2-5 7.4-5s6.2 2 7.4 5zM110.7 41.7l21.5 50.1 50.1 21.5c5.9 2.5 9.7 8.3 9.7 14.7s-3.8 12.2-9.7 14.7l-50.1 21.5-21.5 50.1c-2.5 5.9-8.3 9.7-14.7 9.7s-12.2-3.8-14.7-9.7L59.8 164.2 9.7 142.7C3.8 140.2 0 134.4 0 128s3.8-12.2 9.7-14.7L59.8 91.8 81.3 41.7C83.8 35.8 89.6 32 96 32s12.2 3.8 14.7 9.7zM464 304c6.4 0 12.2 3.8 14.7 9.7l21.5 50.1 50.1 21.5c5.9 2.5 9.7 8.3 9.7 14.7s-3.8 12.2-9.7 14.7l-50.1 21.5-21.5 50.1c-2.5 5.9-8.3 9.7-14.7 9.7s-12.2-3.8-14.7-9.7l-21.5-50.1-50.1-21.5c-5.9-2.5-9.7-8.3-9.7-14.7s3.8-12.2 9.7-14.7l50.1-21.5 21.5-50.1c2.5-5.9 8.3-9.7 14.7-9.7zM460 0c11 0 21.6 4.4 29.5 12.2l42.3 42.3C539.6 62.4 544 73 544 84s-4.4 21.6-12.2 29.5l-88.2 88.2-101.3-101.3 88.2-88.2C438.4 4.4 449 0 460 0zM44.2 398.5L308.4 134.3 409.7 235.6 145.5 499.8C137.6 507.6 127 512 116 512s-21.6-4.4-29.5-12.2L44.2 457.5C36.4 449.6 32 439 32 428s4.4-21.6 12.2-29.5z\"/>"],
   "wifi-slash": ["0 0 576 512", "<path d=\"M288 96c-90.9 0-173.2 36-233.7 94.6-12.7 12.3-33 12-45.2-.7s-12-33 .7-45.2C81.7 74.9 179.9 32 288 32S494.3 74.9 566.3 144.7c12.7 12.3 13 32.6 .7 45.2s-32.6 13-45.2 .7C461.2 132 378.9 96 288 96zM240 432a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zM168 326.2c-11.7 13.3-31.9 14.5-45.2 2.8s-14.5-31.9-2.8-45.2C161 237.4 221.1 208 288 208s127 29.4 168 75.8c11.7 13.3 10.4 33.5-2.8 45.2s-33.5 10.4-45.2-2.8C378.6 292.9 335.8 272 288 272s-90.6 20.9-120 54.2z\"/>"],
   "xmark": ["0 0 384 512", "<path d=\"M55.1 73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L147.2 256 9.9 393.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192.5 301.3 329.9 438.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.8 256 375.1 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192.5 210.7 55.1 73.4z\"/>"],
+  "bars": ["0 0 448 512", "<path d=\"M0 96C0 78.3 14.3 64 32 64l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 128C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 288c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32L32 448c-17.7 0-32-14.3-32-32s14.3-32 32-32l384 0c17.7 0 32 14.3 32 32z\"/>"],
+  "gear": ["0 0 512 512", "<path d=\"M195.1 9.5C198.1-5.3 211.2-16 226.4-16l59.8 0c15.2 0 28.3 10.7 31.3 25.5L332 79.5c14.1 6 27.3 13.7 39.3 22.8l67.8-22.5c14.4-4.8 30.2 1.2 37.8 14.4l29.9 51.8c7.6 13.2 4.9 29.8-6.5 39.9L447 233.3c.9 7.4 1.3 15 1.3 22.7s-.5 15.3-1.3 22.7l53.4 47.5c11.4 10.1 14 26.8 6.5 39.9l-29.9 51.8c-7.6 13.1-23.4 19.2-37.8 14.4l-67.8-22.5c-12.1 9.1-25.3 16.7-39.3 22.8l-14.4 69.9c-3.1 14.9-16.2 25.5-31.3 25.5l-59.8 0c-15.2 0-28.3-10.7-31.3-25.5l-14.4-69.9c-14.1-6-27.2-13.7-39.3-22.8L73.5 432.3c-14.4 4.8-30.2-1.2-37.8-14.4L5.8 366.1c-7.6-13.2-4.9-29.8 6.5-39.9l53.4-47.5c-.9-7.4-1.3-15-1.3-22.7s.5-15.3 1.3-22.7L12.3 185.8c-11.4-10.1-14-26.8-6.5-39.9L35.7 94.1c7.6-13.2 23.4-19.2 37.8-14.4l67.8 22.5c12.1-9.1 25.3-16.7 39.3-22.8L195.1 9.5zM256.3 336a80 80 0 1 0 -.6-160 80 80 0 1 0 .6 160z\"/>"],
 };
 const {
   useState,
@@ -1053,23 +1036,6 @@ function AudioPlayer({
       padding: "0 4px"
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: onDelete,
-    style: {
-      width: 36,
-      height: 36,
-      borderRadius: "50%",
-      background: `${C.red}15`,
-      border: "none",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "trash",
-    size: 14,
-    color: C.red
-  })), /*#__PURE__*/React.createElement("button", {
     onClick: () => skip(-15),
     style: {
       display: "flex",
@@ -1131,23 +1097,22 @@ function AudioPlayer({
       color: C.text2
     }
   }, "15")), /*#__PURE__*/React.createElement("button", {
+    onClick: onDelete,
     style: {
       width: 36,
       height: 36,
       borderRadius: "50%",
-      background: C.bg,
+      background: `${C.red}15`,
       border: "none",
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center",
-      opacity: .4
-    },
-    disabled: true
+      justifyContent: "center"
+    }
   }, /*#__PURE__*/React.createElement(Ic, {
-    n: "share-from-square",
+    n: "trash",
     size: 14,
-    color: C.text2
+    color: C.red
   }))));
 }
 
