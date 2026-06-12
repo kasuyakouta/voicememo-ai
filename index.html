@@ -6,35 +6,41 @@
   <title>VoiceMemo AI</title>
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
-    html,body{height:100%;background:#F2F2F7}#root{height:100vh;height:100dvh;background:#F2F2F7}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;color:#1C1C1E;overflow:hidden}
-    /* iOS Safe Area 対応 */
-    :root{
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-      --safe-top:    env(safe-area-inset-top, 0px);
-    }
+    body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;color:#1C1C1E}
     button{-webkit-appearance:none;appearance:none;border:none;background:none;cursor:pointer;color:inherit}
     input,select,textarea{-webkit-appearance:none;appearance:none;outline:none;font-family:inherit}
     select option{background:#fff;color:#1C1C1E}
     ::-webkit-scrollbar{width:4px}
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:rgba(60,60,67,.2);border-radius:4px}
-
-    /* スクラバー */
-    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;box-shadow:0 0 3px rgba(0,0,0,.25)}
     input[type=range]{-webkit-appearance:none;appearance:none;outline:none}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;box-shadow:0 0 3px rgba(0,0,0,.25)}
+
+    /* ★ 核心：#root を position:fixed で画面全体に固定
+         これによりドキュメントスクロールを完全に封じる */
+    html, body { height: 100%; background: #F2F2F7; overflow: hidden; }
+    #root {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      overflow: hidden;
+      background: #F2F2F7;
+    }
+    /* PC: 中央寄せ */
+    @media (min-width: 768px) {
+      #root > div {
+        max-width: 430px;
+        margin: 0 auto;
+        box-shadow: 0 0 40px rgba(0,0,0,.12);
+        height: 100%;
+      }
+    }
 
     @keyframes pulse-ring{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.55);opacity:0}}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
     @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
-
     .spin{animation:spin .9s linear infinite}
     .shake{animation:shake .5s ease both}
-
-    @media(min-width:768px){
-      #root>div{max-width:430px;margin:0 auto;box-shadow:0 0 40px rgba(0,0,0,.15)}
-    }
   </style>
 </head>
 <body>
@@ -373,8 +379,6 @@ const SVG_ICONS = {
   "wand-magic-sparkles": ["0 0 576 512", "<path d=\"M263.4-27L278.2 9.8 315 24.6c3 1.2 5 4.2 5 7.4s-2 6.2-5 7.4L278.2 54.2 263.4 91c-1.2 3-4.2 5-7.4 5s-6.2-2-7.4-5L233.8 54.2 197 39.4c-3-1.2-5-4.2-5-7.4s2-6.2 5-7.4L233.8 9.8 248.6-27c1.2-3 4.2-5 7.4-5s6.2 2 7.4 5zM110.7 41.7l21.5 50.1 50.1 21.5c5.9 2.5 9.7 8.3 9.7 14.7s-3.8 12.2-9.7 14.7l-50.1 21.5-21.5 50.1c-2.5 5.9-8.3 9.7-14.7 9.7s-12.2-3.8-14.7-9.7L59.8 164.2 9.7 142.7C3.8 140.2 0 134.4 0 128s3.8-12.2 9.7-14.7L59.8 91.8 81.3 41.7C83.8 35.8 89.6 32 96 32s12.2 3.8 14.7 9.7zM464 304c6.4 0 12.2 3.8 14.7 9.7l21.5 50.1 50.1 21.5c5.9 2.5 9.7 8.3 9.7 14.7s-3.8 12.2-9.7 14.7l-50.1 21.5-21.5 50.1c-2.5 5.9-8.3 9.7-14.7 9.7s-12.2-3.8-14.7-9.7l-21.5-50.1-50.1-21.5c-5.9-2.5-9.7-8.3-9.7-14.7s3.8-12.2 9.7-14.7l50.1-21.5 21.5-50.1c2.5-5.9 8.3-9.7 14.7-9.7zM460 0c11 0 21.6 4.4 29.5 12.2l42.3 42.3C539.6 62.4 544 73 544 84s-4.4 21.6-12.2 29.5l-88.2 88.2-101.3-101.3 88.2-88.2C438.4 4.4 449 0 460 0zM44.2 398.5L308.4 134.3 409.7 235.6 145.5 499.8C137.6 507.6 127 512 116 512s-21.6-4.4-29.5-12.2L44.2 457.5C36.4 449.6 32 439 32 428s4.4-21.6 12.2-29.5z\"/>"],
   "wifi-slash": ["0 0 576 512", "<path d=\"M288 96c-90.9 0-173.2 36-233.7 94.6-12.7 12.3-33 12-45.2-.7s-12-33 .7-45.2C81.7 74.9 179.9 32 288 32S494.3 74.9 566.3 144.7c12.7 12.3 13 32.6 .7 45.2s-32.6 13-45.2 .7C461.2 132 378.9 96 288 96zM240 432a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zM168 326.2c-11.7 13.3-31.9 14.5-45.2 2.8s-14.5-31.9-2.8-45.2C161 237.4 221.1 208 288 208s127 29.4 168 75.8c11.7 13.3 10.4 33.5-2.8 45.2s-33.5 10.4-45.2-2.8C378.6 292.9 335.8 272 288 272s-90.6 20.9-120 54.2z\"/>"],
   "xmark": ["0 0 384 512", "<path d=\"M55.1 73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L147.2 256 9.9 393.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192.5 301.3 329.9 438.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.8 256 375.1 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192.5 210.7 55.1 73.4z\"/>"],
-  "bars": ["0 0 448 512", "<path d=\"M0 96C0 78.3 14.3 64 32 64l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 128C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32l384 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 288c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32L32 448c-17.7 0-32-14.3-32-32s14.3-32 32-32l384 0c17.7 0 32 14.3 32 32z\"/>"],
-  "gear": ["0 0 512 512", "<path d=\"M195.1 9.5C198.1-5.3 211.2-16 226.4-16l59.8 0c15.2 0 28.3 10.7 31.3 25.5L332 79.5c14.1 6 27.3 13.7 39.3 22.8l67.8-22.5c14.4-4.8 30.2 1.2 37.8 14.4l29.9 51.8c7.6 13.2 4.9 29.8-6.5 39.9L447 233.3c.9 7.4 1.3 15 1.3 22.7s-.5 15.3-1.3 22.7l53.4 47.5c11.4 10.1 14 26.8 6.5 39.9l-29.9 51.8c-7.6 13.1-23.4 19.2-37.8 14.4l-67.8-22.5c-12.1 9.1-25.3 16.7-39.3 22.8l-14.4 69.9c-3.1 14.9-16.2 25.5-31.3 25.5l-59.8 0c-15.2 0-28.3-10.7-31.3-25.5l-14.4-69.9c-14.1-6-27.2-13.7-39.3-22.8L73.5 432.3c-14.4 4.8-30.2-1.2-37.8-14.4L5.8 366.1c-7.6-13.2-4.9-29.8 6.5-39.9l53.4-47.5c-.9-7.4-1.3-15-1.3-22.7s.5-15.3 1.3-22.7L12.3 185.8c-11.4-10.1-14-26.8-6.5-39.9L35.7 94.1c7.6-13.2 23.4-19.2 37.8-14.4l67.8 22.5c12.1-9.1 25.3-16.7 39.3-22.8L195.1 9.5zM256.3 336a80 80 0 1 0 -.6-160 80 80 0 1 0 .6 160z\"/>"],
 };
 const {
   useState,
@@ -386,39 +390,39 @@ const {
 // ================================================================
 // CONFIG
 // ================================================================
-const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwC91pYajGGtpATaa2ndoAK_7b3F-p2yLgYdRwbVUyytYiKF1lXJz-naOY7jXC4jasU/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwC91pYajGGtpATaa2ndoAK_7b3F-p2yLgYdRwbVUyytYiKF1lXJz-naOY7jXC4jasU/exec";
 const CORRECT_PIN = "3150";
 const AUTH_KEY = "vm_auth_v1";
 const PAGE_SIZE = 20;
 
 // ================================================================
-// COLORS (iOS Light)
+// COLORS
 // ================================================================
 const C = {
-  bg: '#F2F2F7',
-  surface: '#FFFFFF',
-  text: '#1C1C1E',
-  text2: '#8E8E93',
-  text3: 'rgba(60,60,67,0.3)',
-  sep: 'rgba(60,60,67,0.12)',
-  sepHard: 'rgba(60,60,67,0.25)',
-  red: '#FF3B30',
-  blue: '#007AFF',
-  green: '#34C759',
-  orange: '#FF9500',
-  purple: '#AF52DE'
+  bg: "#F2F2F7",
+  surface: "#FFFFFF",
+  text: "#1C1C1E",
+  text2: "#8E8E93",
+  text3: "rgba(60,60,67,0.3)",
+  sep: "rgba(60,60,67,0.12)",
+  sepD: "rgba(60,60,67,0.25)",
+  red: "#FF3B30",
+  blue: "#007AFF",
+  green: "#34C759",
+  orange: "#FF9500",
+  purple: "#AF52DE"
 };
 
 // ================================================================
-// AI PROMPTS
+// PROMPTS
 // ================================================================
 const PROMPTS = {
   interview: {
-    label: '面談',
-    icon: 'user-tie',
+    label: "面談",
+    icon: "user-tie",
     color: C.purple,
     badge: {
-      bg: 'rgba(175,82,222,.12)',
+      bg: "rgba(175,82,222,.12)",
       text: C.purple
     },
     systemPrompt: `あなたは1on1面談の記録アシスタントです。以下の文字起こしから面談記録として重要な情報を構造化して抽出してください。
@@ -426,11 +430,11 @@ const PROMPTS = {
 各2〜4項目、情報がない場合は["特になし"]`
   },
   meeting: {
-    label: '会議',
-    icon: 'people-group',
+    label: "会議",
+    icon: "people-group",
     color: C.blue,
     badge: {
-      bg: 'rgba(0,122,255,.12)',
+      bg: "rgba(0,122,255,.12)",
       text: C.blue
     },
     systemPrompt: `あなたは会議の議事録アシスタントです。以下の文字起こしから会議の重要事項を構造化して抽出してください。
@@ -440,26 +444,23 @@ const PROMPTS = {
 };
 
 // ================================================================
-// GAS API
+// GAS / CACHE / UTILS
 // ================================================================
 const CACHE = {
   members: null,
-  prevRecords: new Map()
+  prev: new Map()
 };
-const TTL = {
-  members: 5 * 60 * 1000,
-  prevRecord: 5 * 60 * 1000
-};
-function isFresh(e, t) {
-  return e && Date.now() - e.ts < t;
+const TTL = 5 * 60 * 1000;
+function isFresh(e) {
+  return e && Date.now() - e.ts < TTL;
 }
 async function gasGet(p) {
-  const r = await fetch(GAS_WEBAPP_URL + "?" + new URLSearchParams(p));
+  const r = await fetch(GAS_URL + "?" + new URLSearchParams(p));
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
 async function gasPost(b) {
-  const r = await fetch(GAS_WEBAPP_URL, {
+  const r = await fetch(GAS_URL, {
     method: "POST",
     headers: {
       "Content-Type": "text/plain"
@@ -469,10 +470,6 @@ async function gasPost(b) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
-
-// ================================================================
-// UTILS
-// ================================================================
 function fmt(s) {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
@@ -484,13 +481,13 @@ function copyText(t) {
   try {
     navigator.clipboard.writeText(t);
     return true;
-  } catch (_e) {
+  } catch {
     return false;
   }
 }
 
 // ================================================================
-// ICON COMPONENT (SVG)
+// SVG ICON
 // ================================================================
 function Ic({
   n,
@@ -502,14 +499,14 @@ function Ic({
   const ico = SVG_ICONS[n];
   if (!ico) return null;
   const [vb, pd] = ico;
-  return React.createElement('svg', {
+  return React.createElement("svg", {
     viewBox: vb,
     width: size,
     height: size,
-    fill: color || 'currentColor',
+    fill: color || "currentColor",
     style: {
-      display: 'inline-block',
-      verticalAlign: 'middle',
+      display: "inline-block",
+      verticalAlign: "middle",
       flexShrink: 0,
       lineHeight: 1,
       ...s
@@ -518,13 +515,9 @@ function Ic({
     dangerouslySetInnerHTML: {
       __html: pd
     },
-    'aria-hidden': 'true'
+    "aria-hidden": "true"
   });
 }
-
-// ================================================================
-// MODE BADGE
-// ================================================================
 function ModeBadge({
   mode,
   small
@@ -551,7 +544,7 @@ function ModeBadge({
 }
 
 // ================================================================
-// PIN SCREEN (Light Theme)
+// PIN SCREEN
 // ================================================================
 const PIN_LABELS = ["", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"];
 function PinScreen({
@@ -584,14 +577,14 @@ function PinScreen({
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      position: "fixed",
+      position: "absolute",
       inset: 0,
       background: C.bg,
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      gap: 0
+      zIndex: 999
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -626,11 +619,11 @@ function PinScreen({
       color: C.text2
     }
   }, "PIN\u30B3\u30FC\u30C9\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044")), /*#__PURE__*/React.createElement("div", {
+    className: shake ? "shake" : "",
     style: {
       display: "flex",
       gap: 18,
-      marginBottom: 48,
-      animation: shake ? "shake .5s ease both" : "none"
+      marginBottom: 48
     }
   }, [0, 1, 2, 3].map(i => /*#__PURE__*/React.createElement("div", {
     key: i,
@@ -638,7 +631,7 @@ function PinScreen({
       width: 14,
       height: 14,
       borderRadius: "50%",
-      border: `2px solid ${err ? C.red : C.sepHard}`,
+      border: `2px solid ${err ? C.red : C.sepD}`,
       background: digits.length > i ? err ? C.red : C.text : "transparent",
       transition: "all .15s"
     }
@@ -657,14 +650,13 @@ function PinScreen({
       borderRadius: "50%",
       background: C.surface,
       border: `1px solid ${C.sep}`,
+      fontSize: 22,
+      fontWeight: 400,
+      color: C.text,
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      cursor: "pointer",
-      fontSize: 22,
-      fontWeight: 400,
-      color: C.text,
       boxShadow: "0 1px 3px rgba(0,0,0,.08)"
     }
   }, /*#__PURE__*/React.createElement("span", null, n), PIN_LABELS[n] && /*#__PURE__*/React.createElement("span", {
@@ -681,10 +673,6 @@ function PinScreen({
       borderRadius: "50%",
       background: C.surface,
       border: `1px solid ${C.sep}`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      cursor: "pointer",
       fontSize: 22,
       color: C.text,
       boxShadow: "0 1px 3px rgba(0,0,0,.08)"
@@ -699,8 +687,7 @@ function PinScreen({
       border: "none",
       display: "flex",
       alignItems: "center",
-      justifyContent: "center",
-      cursor: "pointer"
+      justifyContent: "center"
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "delete-left",
@@ -716,12 +703,12 @@ function PinScreen({
 }
 
 // ================================================================
-// DRAWER MENU
+// DRAWER
 // ================================================================
-function DrawerMenu({
+function Drawer({
   open,
   onClose,
-  onNavigate,
+  onNav,
   onLock
 }) {
   const items = [{
@@ -732,22 +719,18 @@ function DrawerMenu({
     key: "history",
     icon: "clock-rotate-left",
     label: "履歴"
-  }, {
-    key: "search",
-    icon: "magnifying-glass",
-    label: "検索"
   }];
   return /*#__PURE__*/React.createElement(React.Fragment, null, open && /*#__PURE__*/React.createElement("div", {
     onClick: onClose,
     style: {
-      position: "fixed",
+      position: "absolute",
       inset: 0,
       background: "rgba(0,0,0,0.25)",
       zIndex: 100
     }
   }), /*#__PURE__*/React.createElement("div", {
     style: {
-      position: "fixed",
+      position: "absolute",
       top: 0,
       left: 0,
       bottom: 0,
@@ -758,11 +741,11 @@ function DrawerMenu({
       transition: "transform .25s cubic-bezier(.32,1,.36,1)",
       display: "flex",
       flexDirection: "column",
-      boxShadow: open ? "6px 0 24px rgba(0,0,0,.12)" : "none"
+      boxShadow: open ? "6px 0 24px rgba(0,0,0,.1)" : "none"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: "56px 20px 20px",
+      padding: "52px 20px 18px",
       borderBottom: `1px solid ${C.sep}`
     }
   }, /*#__PURE__*/React.createElement("p", {
@@ -780,12 +763,12 @@ function DrawerMenu({
   }, "Powered by Gemini")), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
-      padding: "10px 0"
+      padding: "8px 0"
     }
   }, items.map(item => /*#__PURE__*/React.createElement("button", {
     key: item.key,
     onClick: () => {
-      onNavigate(item.key);
+      onNav(item.key);
       onClose();
     },
     style: {
@@ -834,8 +817,8 @@ function DrawerMenu({
       gap: 10,
       background: C.bg,
       border: "none",
-      cursor: "pointer",
-      borderRadius: 12
+      borderRadius: 12,
+      cursor: "pointer"
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: "lock",
@@ -847,6 +830,60 @@ function DrawerMenu({
       color: C.text2
     }
   }, "\u30ED\u30C3\u30AF")))));
+}
+
+// ================================================================
+// MODE BUTTON（長押しで切替）
+// ================================================================
+function ModeButton({
+  mode,
+  onChange
+}) {
+  const t = useRef(null);
+  const [pressing, setPressing] = useState(false);
+  const cfg = PROMPTS[mode];
+  const start = () => {
+    setPressing(true);
+    t.current = setTimeout(() => {
+      onChange(mode === "interview" ? "meeting" : "interview");
+      setPressing(false);
+    }, 600);
+  };
+  const end = () => {
+    clearTimeout(t.current);
+    setPressing(false);
+  };
+  return /*#__PURE__*/React.createElement("button", {
+    onMouseDown: start,
+    onMouseUp: end,
+    onTouchStart: start,
+    onTouchEnd: end,
+    onContextMenu: e => e.preventDefault(),
+    style: {
+      background: cfg.badge.bg,
+      color: cfg.color,
+      border: `1px solid ${cfg.color}25`,
+      borderRadius: 20,
+      padding: "6px 13px",
+      fontSize: 12,
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      cursor: "pointer",
+      transform: pressing ? "scale(.96)" : "scale(1)",
+      transition: "transform .1s"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: cfg.icon,
+    size: 12,
+    color: cfg.color
+  }), cfg.label, "\u30E2\u30FC\u30C9", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      opacity: .6
+    }
+  }, "\u9577\u62BC\u3057\u3067\u5207\u66FF"));
 }
 
 // ================================================================
@@ -897,11 +934,11 @@ function Waveform({
   return /*#__PURE__*/React.createElement("canvas", {
     ref: cvRef,
     width: 300,
-    height: 44,
+    height: 40,
     style: {
       width: "100%",
       maxWidth: 300,
-      height: 44,
+      height: 40,
       display: "block",
       margin: "0 auto"
     }
@@ -909,7 +946,7 @@ function Waveform({
 }
 
 // ================================================================
-// AUDIO PLAYER (Light)
+// AUDIO PLAYER
 // ================================================================
 function AudioPlayer({
   url,
@@ -937,7 +974,7 @@ function AudioPlayer({
       setPlaying(false);
     } else {
       const p = a.play();
-      if (p && p.then) p.then(() => setPlaying(true)).catch(_e => setPlaying(false));else setPlaying(true);
+      if (p && p.then) p.then(() => setPlaying(true)).catch(() => setPlaying(false));else setPlaying(true);
     }
   };
   const skip = s => {
@@ -950,7 +987,7 @@ function AudioPlayer({
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: "10px 16px 8px",
+      padding: "10px 14px 8px",
       borderTop: `1px solid ${C.sep}`
     }
   }, /*#__PURE__*/React.createElement("audio", {
@@ -974,7 +1011,26 @@ function AudioPlayer({
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "-", fmt(Math.max(0, dur - cur)))), /*#__PURE__*/React.createElement("input", {
+  }, "-", fmt(Math.max(0, dur - cur)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 3,
+      background: C.sep,
+      borderRadius: 4,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: `${dur > 0 ? cur / dur * 100 : 0}%`,
+      height: "100%",
+      background: C.red,
+      borderRadius: 4
+    }
+  })), /*#__PURE__*/React.createElement("input", {
     type: "range",
     min: 0,
     max: dur || 1,
@@ -982,17 +1038,14 @@ function AudioPlayer({
     value: cur,
     onChange: e => seek(parseFloat(e.target.value)),
     style: {
+      position: "absolute",
+      inset: 0,
+      opacity: 0,
       width: "100%",
-      height: 3,
-      appearance: "none",
-      WebkitAppearance: "none",
-      background: `linear-gradient(to right,${C.red} ${dur > 0 ? cur / dur * 100 : 0}%,rgba(60,60,67,.2) 0)`,
-      borderRadius: 4,
-      outline: "none",
       cursor: "pointer",
-      marginBottom: 10
+      height: "100%"
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -1048,7 +1101,7 @@ function AudioPlayer({
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      boxShadow: "0 2px 8px rgba(255,59,48,.35)"
+      boxShadow: `0 2px 8px ${C.red}45`
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: playing ? "pause" : "play",
@@ -1101,6 +1154,63 @@ function AudioPlayer({
 // ================================================================
 // EDITABLE SUMMARY
 // ================================================================
+function TranscriptAccordion({
+  text
+}) {
+  const [open, setOpen] = useState(false);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 10,
+      overflow: "hidden",
+      border: `1px solid ${C.sep}`,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(o => !o),
+    style: {
+      width: "100%",
+      padding: "8px 12px",
+      background: C.bg,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      border: "none",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "file-lines",
+    size: 13,
+    color: C.blue
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.text
+    }
+  }, "\u6587\u5B57\u8D77\u3053\u3057")), /*#__PURE__*/React.createElement(Ic, {
+    n: open ? "chevron-up" : "chevron-down",
+    size: 12,
+    color: C.text2
+  })), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 12px 10px",
+      background: C.surface
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: C.text2,
+      lineHeight: 1.75,
+      margin: 0
+    }
+  }, text)));
+}
 function EditableSummary({
   sections: init,
   mode,
@@ -1258,7 +1368,13 @@ function EditableSummary({
       fontWeight: 600,
       color: C.text
     }
-  }, sec.label)), /*#__PURE__*/React.createElement("div", {
+  }, sec.label), editing && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: C.text2,
+      marginLeft: "auto"
+    }
+  }, "\u7DE8\u96C6\u4E2D")), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "8px 12px 10px",
       background: C.surface
@@ -1304,63 +1420,6 @@ function EditableSummary({
     }
   }), /*#__PURE__*/React.createElement("span", null, item)))))));
 }
-function TranscriptAccordion({
-  text
-}) {
-  const [open, setOpen] = useState(false);
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      borderRadius: 10,
-      overflow: "hidden",
-      border: `1px solid ${C.sep}`,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setOpen(o => !o),
-    style: {
-      width: "100%",
-      padding: "8px 12px",
-      background: C.bg,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      border: "none",
-      cursor: "pointer"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "file-lines",
-    size: 13,
-    color: C.blue
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: C.text
-    }
-  }, "\u6587\u5B57\u8D77\u3053\u3057")), /*#__PURE__*/React.createElement(Ic, {
-    n: open ? "chevron-up" : "chevron-down",
-    size: 12,
-    color: C.text2
-  })), open && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "8px 12px 10px",
-      background: C.surface
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 13,
-      color: C.text2,
-      lineHeight: 1.75,
-      margin: 0
-    }
-  }, text)));
-}
 
 // ================================================================
 // EXPORT PANEL
@@ -1396,7 +1455,7 @@ function ExportPanel({
     const sH = (item.sections?.sections || []).map(s => `<div class="ps"><div class="pt">${s.emoji} ${s.label}</div>${s.items.map(i => `<div class="pi">${i}</div>`).join("")}</div>`).join("");
     const tH = item.sections?._transcript ? `<div class="ps"><div class="pt">📝 文字起こし</div><pre class="pT">${item.sections._transcript}</pre></div>` : "";
     const w = window.open("", "_blank");
-    w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${cfg.label}記録 - ${title}</title><style>body{font-family:-apple-system,sans-serif;font-size:11pt;color:#000;margin:20mm 18mm;line-height:1.6}.h{border-bottom:2px solid #333;padding-bottom:10pt;margin-bottom:16pt}.ht{font-size:17pt;font-weight:bold;margin-bottom:5pt}.hm{font-size:10pt;color:#555}.hb{background:#eee;border-radius:4pt;padding:1pt 6pt;font-size:9pt;margin-left:8pt}.ps{margin-bottom:14pt;page-break-inside:avoid}.pt{font-size:12pt;font-weight:bold;margin-bottom:7pt;border-left:3px solid #555;padding-left:8pt}.pi{font-size:11pt;margin-bottom:4pt;padding-left:14pt;position:relative}.pi::before{content:"•";position:absolute;left:4pt}.pT{font-size:10pt;line-height:1.7;color:#333;white-space:pre-wrap;background:#f8f8f8;padding:10pt;border-radius:4pt;font-family:inherit}@media print{@page{margin:20mm 18mm}}</style></head><body><div class="h"><div class="ht">${title}<span class="hb">${cfg.label}</span></div><div class="hm">日時：${item.date}　録音時間：${item.duration}</div></div>${sH}${tH}</body></html>`);
+    w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${cfg.label}記録</title><style>body{font-family:-apple-system,sans-serif;font-size:11pt;color:#000;margin:20mm 18mm;line-height:1.6}.h{border-bottom:2px solid #333;padding-bottom:10pt;margin-bottom:16pt}.ht{font-size:17pt;font-weight:bold;margin-bottom:5pt}.hm{font-size:10pt;color:#555}.hb{background:#eee;border-radius:4pt;padding:1pt 6pt;font-size:9pt;margin-left:8pt}.ps{margin-bottom:14pt;page-break-inside:avoid}.pt{font-size:12pt;font-weight:bold;margin-bottom:7pt;border-left:3px solid #555;padding-left:8pt}.pi{font-size:11pt;margin-bottom:4pt;padding-left:14pt;position:relative}.pi::before{content:"•";position:absolute;left:4pt}.pT{font-size:10pt;line-height:1.7;white-space:pre-wrap;background:#f8f8f8;padding:10pt;border-radius:4pt;font-family:inherit}</style></head><body><div class="h"><div class="ht">${title}<span class="hb">${cfg.label}</span></div><div class="hm">日時：${item.date}　録音：${item.duration}</div></div>${sH}${tH}</body></html>`);
     w.document.close();
     w.onload = () => w.print();
   };
@@ -1419,14 +1478,14 @@ function ExportPanel({
     color: C.green,
     bg: `${C.green}12`,
     label: "要約をコピー",
-    sub: "箇条書きの要約のみ"
+    sub: "箇条書きのみ"
   }, {
     type: "full",
     icon: "file-lines",
     color: C.blue,
     bg: `${C.blue}12`,
     label: "全文をコピー",
-    sub: "要約＋文字起こし全文"
+    sub: "要約＋文字起こし"
   }].map(({
     type,
     icon,
@@ -1442,7 +1501,7 @@ function ExportPanel({
       alignItems: "center",
       gap: 12,
       width: "100%",
-      padding: "12px 14px",
+      padding: "11px 13px",
       background: C.bg,
       border: `1px solid ${C.sep}`,
       borderRadius: 12,
@@ -1483,7 +1542,7 @@ function ExportPanel({
       alignItems: "center",
       gap: 12,
       width: "100%",
-      padding: "12px 14px",
+      padding: "11px 13px",
       background: C.bg,
       border: `1px solid ${C.sep}`,
       borderRadius: 12,
@@ -1521,16 +1580,16 @@ function ExportPanel({
 }
 
 // ================================================================
-// SUMMARY MODAL (Bottom Sheet)
+// SUMMARY MODAL
 // ================================================================
 function SummaryModal({
   item,
   onClose,
-  onSectionsUpdated
+  onSaved
 }) {
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      position: "fixed",
+      position: "absolute",
       inset: 0,
       background: "rgba(0,0,0,0.3)",
       display: "flex",
@@ -1541,7 +1600,7 @@ function SummaryModal({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       width: "100%",
-      maxHeight: "90vh",
+      maxHeight: "90%",
       background: C.surface,
       borderRadius: "20px 20px 0 0",
       display: "flex",
@@ -1566,7 +1625,7 @@ function SummaryModal({
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "12px 20px 10px"
+      padding: "12px 18px 10px"
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1626,158 +1685,22 @@ function SummaryModal({
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       overflowY: "auto",
-      padding: "0 20px 40px",
+      padding: "0 18px 40px",
       flex: 1
     }
   }, item.sections && /*#__PURE__*/React.createElement(EditableSummary, {
     sections: item.sections,
     mode: item.mode,
     recordId: item.id,
-    onSaved: onSectionsUpdated
+    onSaved: onSaved
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       borderTop: `1px solid ${C.sep}`,
-      margin: "16px 0"
+      margin: "14px 0"
     }
   }), /*#__PURE__*/React.createElement(ExportPanel, {
     item: item
   }))));
-}
-
-// ================================================================
-// RECORDING CARD (Home Screen)
-// ================================================================
-function RecordingCard({
-  rec,
-  onProcess,
-  onDelete,
-  onViewSummary,
-  processing,
-  processingId
-}) {
-  const cfg = PROMPTS[rec.mode] || PROMPTS.meeting;
-  const title = rec.mode === "meeting" ? rec.meetingName || "（会議名未入力）" : rec.member;
-  const isProcessing = processingId === rec.localId;
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.surface,
-      borderRadius: 14,
-      overflow: "hidden",
-      marginBottom: 12,
-      border: `1px solid ${C.sep}`,
-      boxShadow: "0 1px 4px rgba(0,0,0,.06)"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "12px 14px 8px",
-      display: "flex",
-      alignItems: "flex-start",
-      justifyContent: "space-between"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6,
-      flexWrap: "wrap",
-      marginBottom: 3
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 15,
-      fontWeight: 600,
-      color: C.text
-    }
-  }, title), rec.interviewee && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      color: C.text3
-    }
-  }, "\u2192"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13,
-      fontWeight: 500,
-      color: C.purple
-    }
-  }, rec.interviewee)), /*#__PURE__*/React.createElement(ModeBadge, {
-    mode: rec.mode,
-    small: true
-  })), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 11,
-      color: C.text2
-    }
-  }, rec.date, " \xB7 ", rec.duration))), rec.url && /*#__PURE__*/React.createElement(AudioPlayer, {
-    url: rec.url,
-    onDelete: () => onDelete(rec.localId)
-  }), rec.url && !rec.processed && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "8px 14px 12px"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => onProcess(rec),
-    disabled: isProcessing,
-    style: {
-      width: "100%",
-      padding: "11px",
-      background: isProcessing ? `${C.blue}60` : C.blue,
-      color: "#fff",
-      border: "none",
-      borderRadius: 10,
-      fontSize: 14,
-      fontWeight: 600,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 7,
-      cursor: "pointer"
-    }
-  }, isProcessing ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
-    n: "spinner",
-    size: 14,
-    color: "#fff",
-    cls: "spin"
-  }), "AI\u51E6\u7406\u4E2D...") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
-    n: "wand-magic-sparkles",
-    size: 14,
-    color: "#fff"
-  }), "Gemini\u3067\u6587\u5B57\u8D77\u3053\u3057\uFF06\u8981\u7D04"))), rec.processed && rec.sections && /*#__PURE__*/React.createElement("button", {
-    onClick: () => onViewSummary(rec),
-    style: {
-      width: "100%",
-      padding: "6px 14px 12px",
-      background: "none",
-      border: "none",
-      cursor: "pointer",
-      textAlign: "left",
-      borderTop: `1px solid ${C.sep}`
-    }
-  }, (rec.sections.sections || []).slice(0, 2).map((sec, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      display: "flex",
-      alignItems: "flex-start",
-      gap: 6,
-      padding: "3px 0"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13
-    }
-  }, sec.emoji), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.text2,
-      lineHeight: 1.5
-    }
-  }, sec.items[0]))), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: C.blue,
-      marginTop: 4,
-      fontWeight: 500
-    }
-  }, "\u8A73\u7D30\u3092\u898B\u308B \u2192")));
 }
 
 // ================================================================
@@ -1794,8 +1717,8 @@ function PrevRecordCard({
       setRecord(null);
       return;
     }
-    const cached = CACHE.prevRecords.get(member);
-    if (isFresh(cached, TTL.prevRecord)) {
+    const cached = CACHE.prev.get(member);
+    if (isFresh(cached)) {
       setRecord(cached.data);
       return;
     }
@@ -1810,12 +1733,12 @@ function PrevRecordCard({
         if (!cancelled) {
           const r = d.record || null;
           setRecord(r);
-          CACHE.prevRecords.set(member, {
+          CACHE.prev.set(member, {
             data: r,
             ts: Date.now()
           });
         }
-      } catch (_e) {
+      } catch {
         if (!cancelled) setRecord(null);
       }
       if (!cancelled) setLoading(false);
@@ -1917,6 +1840,698 @@ function PrevRecordCard({
 }
 
 // ================================================================
+// RECORDING CARD
+// ================================================================
+function RecordingCard({
+  rec,
+  onProcess,
+  onDelete,
+  onView,
+  processingId
+}) {
+  const cfg = PROMPTS[rec.mode] || PROMPTS.meeting;
+  const title = rec.mode === "meeting" ? rec.meetingName || "（会議名未入力）" : rec.member;
+  const isProcss = processingId === rec.localId;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.surface,
+      borderRadius: 14,
+      overflow: "hidden",
+      marginBottom: 12,
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 4px rgba(0,0,0,.05)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px 8px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      flexWrap: "wrap",
+      marginBottom: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 15,
+      fontWeight: 600,
+      color: C.text
+    }
+  }, title), rec.interviewee && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: C.text3
+    }
+  }, "\u2192"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: C.purple
+    }
+  }, rec.interviewee)), /*#__PURE__*/React.createElement(ModeBadge, {
+    mode: rec.mode,
+    small: true
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: C.text2
+    }
+  }, rec.date, " \xB7 ", rec.duration)), rec.url && /*#__PURE__*/React.createElement(AudioPlayer, {
+    url: rec.url,
+    onDelete: () => onDelete(rec.localId)
+  }), rec.url && !rec.processed && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 14px 12px"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => onProcess(rec),
+    disabled: isProcss,
+    style: {
+      width: "100%",
+      padding: "11px",
+      background: isProcss ? `${C.blue}60` : C.blue,
+      color: "#fff",
+      border: "none",
+      borderRadius: 10,
+      fontSize: 14,
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+      cursor: "pointer"
+    }
+  }, isProcss ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
+    n: "spinner",
+    size: 14,
+    color: "#fff",
+    cls: "spin"
+  }), "AI\u51E6\u7406\u4E2D...") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Ic, {
+    n: "wand-magic-sparkles",
+    size: 14,
+    color: "#fff"
+  }), "Gemini\u3067\u6587\u5B57\u8D77\u3053\u3057\uFF06\u8981\u7D04"))), rec.processed && rec.sections && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onView(rec),
+    style: {
+      width: "100%",
+      padding: "6px 14px 12px",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      textAlign: "left",
+      borderTop: `1px solid ${C.sep}`
+    }
+  }, (rec.sections.sections || []).slice(0, 2).map((sec, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 6,
+      padding: "3px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13
+    }
+  }, sec.emoji), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.text2,
+      lineHeight: 1.5
+    }
+  }, sec.items[0]))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: C.blue,
+      marginTop: 4,
+      fontWeight: 500
+    }
+  }, "\u8A73\u7D30\u3092\u898B\u308B \u2192")));
+}
+
+// ================================================================
+// HOME SCREEN  ← アーキテクチャ刷新版
+//
+// 構造：
+//   外側 flex col (height:100%)
+//   ├── コンテンツエリア (flex:1, overflow-y:auto) ← ここだけスクロール
+//   │   ├── エラーバナー
+//   │   ├── 前回フォロー
+//   │   ├── 録音カード / 空状態
+//   │   └── 入力欄（スクロールエリア内）
+//   └── ボタンバー (flex-shrink:0) ← 通常フロー、常に最下部
+// ================================================================
+function HomeScreen({
+  mode,
+  members,
+  membersLoading,
+  member,
+  setMember,
+  interviewee,
+  setInterviewee,
+  meetingName,
+  setMeetingName,
+  isOnline,
+  onRecordSaved
+}) {
+  const [recState, setRecState] = useState("idle");
+  const [timer, setTimer] = useState(0);
+  const [stream, setStream] = useState(null);
+  const [localRecs, setLocalRecs] = useState([]);
+  const [processingId, setProcessingId] = useState(null);
+  const [selectedRec, setSelectedRec] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [error, setError] = useState(null);
+  const mrRef = useRef(null),
+    chunksRef = useRef([]),
+    timerRef = useRef(null);
+  const savedTimer = useRef(0),
+    savedDate = useRef(""),
+    contentRef = useRef(null);
+  useEffect(() => {
+    if (recState === "recording") timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);else clearInterval(timerRef.current);
+    return () => clearInterval(timerRef.current);
+  }, [recState]);
+
+  // 新録音追加時に最下部へスクロール
+  useEffect(() => {
+    if (localRecs.length >= 2 && contentRef.current) {
+      setTimeout(() => {
+        if (contentRef.current) contentRef.current.scrollTop = contentRef.current.scrollHeight;
+      }, 100);
+    }
+  }, [localRecs.length]);
+  const startRec = async () => {
+    if (mode === "interview" && !member) return;
+    if (!isOnline) {
+      setError("オフラインです。接続を確認してください。");
+      return;
+    }
+    setError(null);
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        audio: true
+      });
+      const mime = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"].find(t => {
+        try {
+          return MediaRecorder.isTypeSupported(t);
+        } catch {
+          return false;
+        }
+      }) || "";
+      const mr = new MediaRecorder(s, mime ? {
+        mimeType: mime
+      } : {});
+      chunksRef.current = [];
+      mr.ondataavailable = e => e.data.size > 0 && chunksRef.current.push(e.data);
+      mr.onstop = () => {
+        s.getTracks().forEach(t => t.stop());
+        setStream(null);
+      };
+      mr.start(100);
+      mrRef.current = mr;
+      setStream(s);
+      setRecState("recording");
+      setTimer(0);
+      savedTimer.current = 0;
+    } catch {
+      alert("マイクへのアクセスを許可してください。");
+    }
+  };
+  const stopRec = () => {
+    savedTimer.current = timer;
+    savedDate.current = nowStr();
+    mrRef.current?.stop();
+    const blob = new Blob(chunksRef.current, {
+      type: mrRef.current?.mimeType || "audio/mp4"
+    });
+    const url = URL.createObjectURL(blob);
+    const localId = Date.now();
+    setLocalRecs(prev => [...prev, {
+      localId,
+      url,
+      date: savedDate.current,
+      duration: fmt(savedTimer.current || timer),
+      member: member || "",
+      interviewee: interviewee || "",
+      meetingName: meetingName || "",
+      mode,
+      processed: false,
+      sections: null,
+      id: null,
+      chunks: [...chunksRef.current]
+    }]);
+    setRecState("stopped");
+  };
+  const pauseRec = () => {
+    mrRef.current?.pause();
+    setRecState("paused");
+  };
+  const resumeRec = () => {
+    mrRef.current?.resume();
+    setRecState("recording");
+  };
+  const processRec = async rec => {
+    if (!isOnline) {
+      setError("オフラインです。接続を確認してください。");
+      return;
+    }
+    setProcessingId(rec.localId);
+    try {
+      const blob = new Blob(rec.chunks, {
+        type: mrRef.current?.mimeType || "audio/mp4"
+      });
+      const b64 = await new Promise(res => {
+        const r = new FileReader();
+        r.onloadend = () => res(r.result.split(",")[1]);
+        r.readAsDataURL(blob);
+      });
+      const data = await gasPost({
+        action: "transcribe",
+        member: rec.member,
+        interviewee: rec.interviewee,
+        meetingName: rec.meetingName,
+        audio: b64,
+        mimeType: mrRef.current?.mimeType || "audio/mp4",
+        duration: rec.duration,
+        date: rec.date,
+        mode: rec.mode,
+        systemPrompt: PROMPTS[rec.mode].systemPrompt
+      });
+      setLocalRecs(prev => prev.map(r => r.localId === rec.localId ? {
+        ...r,
+        processed: true,
+        sections: data.sections,
+        id: data.id
+      } : r));
+      if (onRecordSaved) onRecordSaved({
+        id: data.id,
+        date: rec.date,
+        duration: rec.duration,
+        member: rec.member,
+        interviewee: rec.interviewee,
+        meetingName: rec.meetingName,
+        mode: rec.mode,
+        sections: data.sections
+      });
+      if (mode === "interview" && rec.member) CACHE.prev.delete(rec.member);
+    } catch (e) {
+      setError("処理に失敗しました: " + e.message);
+    }
+    setProcessingId(null);
+  };
+  const deleteRec = id => {
+    setLocalRecs(prev => prev.filter(r => r.localId !== id));
+    setConfirmDelete(null);
+  };
+  const isActive = recState === "recording" || recState === "paused";
+  const canRecord = mode === "meeting" || !!member;
+
+  // インプットフィールドスタイル（共通）
+  const inputStyle = {
+    width: "100%",
+    background: C.bg,
+    color: C.text,
+    border: `1.5px solid ${C.sep}`,
+    borderRadius: 10,
+    padding: "11px 13px 11px 32px",
+    fontSize: 15,
+    outline: "none"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      height: "100%",
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    ref: contentRef,
+    style: {
+      flex: 1,
+      overflowY: "auto",
+      WebkitOverflowScrolling: "touch"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      display: "flex",
+      flexDirection: "column",
+      minHeight: "100%"
+    }
+  }, error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: `${C.red}12`,
+      border: `1px solid ${C.red}25`,
+      borderRadius: 10,
+      padding: "10px 12px",
+      marginBottom: 10,
+      fontSize: 13,
+      color: C.red,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "circle-exclamation",
+    size: 14,
+    color: C.red
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, error), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setError(null),
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "xmark",
+    size: 13,
+    color: C.text2
+  }))), recState === "idle" && mode === "interview" && member && /*#__PURE__*/React.createElement(PrevRecordCard, {
+    member: member
+  }), localRecs.length === 0 && recState !== "recording" && recState !== "paused" ?
+  /*#__PURE__*/
+  /* 空状態：flex:1で上下中央に */
+  React.createElement("div", {
+    style: {
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px 0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 52,
+      marginBottom: 12,
+      opacity: .1
+    }
+  }, "\uD83C\uDF99"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: C.text2,
+      fontSize: 14,
+      lineHeight: 1.7,
+      textAlign: "center"
+    }
+  }, mode === "meeting" ? meetingName || "会議モードで録音を開始します" : member ? "録音を開始してください" : "まずメンバーを選択してください")) : localRecs.map(rec => /*#__PURE__*/React.createElement("div", {
+    key: rec.localId
+  }, confirmDelete === rec.localId ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.surface,
+      borderRadius: 14,
+      padding: 18,
+      marginBottom: 12,
+      border: `1px solid ${C.sep}`,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 15,
+      fontWeight: 500,
+      color: C.text,
+      marginBottom: 5
+    }
+  }, "\u9332\u97F3\u3092\u524A\u9664\u3057\u307E\u3059\u304B\uFF1F"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: C.text2,
+      marginBottom: 16
+    }
+  }, "\u3053\u306E\u64CD\u4F5C\u306F\u53D6\u308A\u6D88\u305B\u307E\u305B\u3093"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmDelete(null),
+    style: {
+      flex: 1,
+      padding: "11px 0",
+      borderRadius: 10,
+      background: C.bg,
+      border: `1px solid ${C.sep}`,
+      fontSize: 15,
+      color: C.text,
+      cursor: "pointer"
+    }
+  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => deleteRec(rec.localId),
+    style: {
+      flex: 1,
+      padding: "11px 0",
+      borderRadius: 10,
+      background: C.red,
+      border: "none",
+      fontSize: 15,
+      fontWeight: 600,
+      color: "#fff",
+      cursor: "pointer"
+    }
+  }, "\u524A\u9664"))) : /*#__PURE__*/React.createElement(RecordingCard, {
+    rec: rec,
+    onProcess: processRec,
+    onDelete: id => setConfirmDelete(id),
+    onView: setSelectedRec,
+    processingId: processingId
+  }))), !isActive && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: "auto",
+      paddingTop: 16
+    }
+  }, mode === "interview" ? /*#__PURE__*/React.createElement(React.Fragment, null, membersLoading ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 44,
+      display: "flex",
+      alignItems: "center",
+      gap: 7,
+      color: C.text2,
+      fontSize: 14,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "spinner",
+    size: 13,
+    color: C.text2,
+    cls: "spin"
+  }), "\u8AAD\u307F\u8FBC\u307F\u4E2D...") : /*#__PURE__*/React.createElement("select", {
+    value: member,
+    onChange: e => setMember(e.target.value),
+    style: {
+      ...inputStyle,
+      padding: "11px 36px 11px 13px",
+      marginBottom: 8,
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238E8E93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+      backgroundRepeat: "no-repeat",
+      backgroundPosition: "right 12px center",
+      border: `1.5px solid ${member ? C.blue : C.sep}`
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u9762\u8AC7\u62C5\u5F53\u3092\u9078\u629E...\uFF08\u5165\u529B\u5FC5\u9808\uFF09"), members.map(m => /*#__PURE__*/React.createElement("option", {
+    key: m,
+    value: m
+  }, m))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "user",
+    size: 13,
+    color: C.text2,
+    style: {
+      position: "absolute",
+      left: 11,
+      top: "50%",
+      transform: "translateY(-50%)"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: interviewee,
+    onChange: e => setInterviewee(e.target.value),
+    placeholder: "\u76F8\u624B\uFF08\u4EFB\u610F\uFF09",
+    style: inputStyle
+  }))) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "people-group",
+    size: 13,
+    color: C.text2,
+    style: {
+      position: "absolute",
+      left: 11,
+      top: "50%",
+      transform: "translateY(-50%)"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: meetingName,
+    onChange: e => setMeetingName(e.target.value),
+    placeholder: "\u4F1A\u8B70\u540D\uFF08\u4EFB\u610F\uFF09",
+    style: inputStyle
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flexShrink: 0,
+      background: C.surface,
+      borderTop: `1px solid ${C.sep}`,
+      padding: "10px 16px 0",
+      paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))"
+    }
+  }, isActive && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginBottom: 6,
+      fontSize: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: recState === "recording" ? C.red : C.text2,
+      fontWeight: 500
+    }
+  }, recState === "recording" ? "● 録音中" : "⏸ 一時停止中"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.text2,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, fmt(timer))), /*#__PURE__*/React.createElement(Waveform, {
+    stream: stream,
+    paused: recState === "paused"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 24
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 44,
+      opacity: recState === "recording" ? 1 : 0,
+      transition: "opacity .2s",
+      pointerEvents: recState === "recording" ? "auto" : "none"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: pauseRec,
+    style: {
+      width: 44,
+      height: 44,
+      borderRadius: "50%",
+      background: C.bg,
+      border: `1px solid ${C.sep}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "pause",
+    size: 17,
+    color: C.text
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, recState === "recording" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      inset: -8,
+      borderRadius: "50%",
+      background: `${C.red}22`,
+      animation: "pulse-ring 1.4s ease-out infinite"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: isActive ? stopRec : startRec,
+    disabled: !canRecord && !isActive,
+    style: {
+      width: 72,
+      height: 72,
+      position: "relative",
+      zIndex: 1,
+      borderRadius: isActive ? "22px" : "50%",
+      background: !canRecord && !isActive ? `${C.red}40` : C.red,
+      border: "none",
+      cursor: !canRecord && !isActive ? "default" : "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      boxShadow: isActive ? "none" : `0 4px 16px ${C.red}45`,
+      transition: "border-radius .35s cubic-bezier(.34,1.56,.64,1),box-shadow .3s"
+    }
+  }, isActive ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 26,
+      height: 26,
+      borderRadius: 6,
+      background: "#fff"
+    }
+  }) : /*#__PURE__*/React.createElement(Ic, {
+    n: "microphone",
+    size: 28,
+    color: "#fff"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 44,
+      opacity: recState === "paused" ? 1 : 0,
+      transition: "opacity .2s",
+      pointerEvents: recState === "paused" ? "auto" : "none"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: resumeRec,
+    style: {
+      width: 44,
+      height: 44,
+      borderRadius: "50%",
+      background: `${C.green}15`,
+      border: `1px solid ${C.green}30`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "play",
+    size: 16,
+    color: C.green,
+    style: {
+      marginLeft: 2
+    }
+  })))), /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: C.text2,
+      marginTop: 6
+    }
+  }, recState === "recording" ? "タップして停止" : recState === "paused" ? "再開または停止" : recState === "stopped" ? "" : "タップして録音")), selectedRec && /*#__PURE__*/React.createElement(SummaryModal, {
+    item: selectedRec,
+    onClose: () => setSelectedRec(null),
+    onSaved: newSecs => {
+      setSelectedRec(s => ({
+        ...s,
+        sections: newSecs
+      }));
+      setLocalRecs(rs => rs.map(r => r.localId === selectedRec.localId ? {
+        ...r,
+        sections: newSecs
+      } : r));
+    }
+  }));
+}
+
+// ================================================================
 // HISTORY SCREEN
 // ================================================================
 function HistoryScreen({
@@ -1997,9 +2612,7 @@ function HistoryScreen({
     ob.observe(sentinelRef.current);
     return () => ob.disconnect();
   }, [hasMore, moreLoad]);
-  const filtered = records.filter(item => {
-    return (filterMem === "ALL" || item.member === filterMem) && (filterMode === "ALL" || item.mode === filterMode) && (!q || (item.sections?._transcript || "").includes(q) || (item.sections?.sections || []).some(s => s.items.some(i => i.includes(q))) || (item.member || "").includes(q) || (item.interviewee || "").includes(q) || (item.meetingName || "").includes(q));
-  });
+  const filtered = records.filter(item => (filterMem === "ALL" || item.member === filterMem) && (filterMode === "ALL" || item.mode === filterMode) && (!q || (item.sections?._transcript || "").includes(q) || (item.sections?.sections || []).some(s => s.items.some(i => i.includes(q))) || (item.member || "").includes(q) || (item.interviewee || "").includes(q) || (item.meetingName || "").includes(q)));
   const handleSaved = newSecs => {
     setSelected(s => ({
       ...s,
@@ -2019,7 +2632,7 @@ function HistoryScreen({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: "14px 16px 0",
+      padding: "12px 16px 0",
       flexShrink: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -2029,19 +2642,19 @@ function HistoryScreen({
       justifyContent: "space-between",
       marginBottom: 12
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
   }, /*#__PURE__*/React.createElement("h2", {
     style: {
       fontSize: 20,
       fontWeight: 700,
       color: C.text
     }
-  }, "\u9332\u97F3\u5C65\u6B74"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8
-    }
-  }, !initLoad && total > 0 && /*#__PURE__*/React.createElement("span", {
+  }, "\u9332\u97F3\u5C65\u6B74"), !initLoad && total > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       color: C.text2,
@@ -2049,7 +2662,7 @@ function HistoryScreen({
       padding: "2px 8px",
       borderRadius: 12
     }
-  }, "\u5168", total, "\u4EF6"), /*#__PURE__*/React.createElement("button", {
+  }, "\u5168", total, "\u4EF6")), /*#__PURE__*/React.createElement("button", {
     onClick: () => fetchFirst(),
     disabled: initLoad,
     style: {
@@ -2068,7 +2681,7 @@ function HistoryScreen({
     size: 14,
     color: C.text2,
     cls: initLoad ? "spin" : ""
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
       marginBottom: 10
@@ -2221,7 +2834,7 @@ function HistoryScreen({
         marginBottom: 8,
         textAlign: "left",
         cursor: "pointer",
-        boxShadow: "0 1px 3px rgba(0,0,0,.05)",
+        boxShadow: "0 1px 3px rgba(0,0,0,.04)",
         display: "flex",
         alignItems: "center",
         gap: 11
@@ -2341,563 +2954,12 @@ function HistoryScreen({
   }, "\u5168", total, "\u4EF6\u3092\u8868\u793A\u3057\u3066\u3044\u307E\u3059")), selected && /*#__PURE__*/React.createElement(SummaryModal, {
     item: selected,
     onClose: () => setSelected(null),
-    onSectionsUpdated: newSecs => {
-      setSelected(s => ({
-        ...s,
-        sections: newSecs
-      }));
-      setRecords(rs => rs.map(r => r.id === selected.id ? {
-        ...r,
-        sections: newSecs
-      } : r));
-    }
+    onSaved: handleSaved
   }));
 }
 
 // ================================================================
-// HOME SCREEN
-// ================================================================
-function HomeScreen({
-  mode,
-  members,
-  membersLoading,
-  member,
-  setMember,
-  interviewee,
-  setInterviewee,
-  meetingName,
-  setMeetingName,
-  isOnline,
-  newRecordForHistory
-}) {
-  const [recState, setRecState] = useState("idle");
-  const [timer, setTimer] = useState(0);
-  const [stream, setStream] = useState(null);
-  const [localRecs, setLocalRecs] = useState([]);
-  const [processingId, setProcessingId] = useState(null);
-  const [selectedRec, setSelectedRec] = useState(null);
-  const [showDelete, setShowDelete] = useState(null);
-  const [error, setError] = useState(null);
-  const mrRef = useRef(null),
-    chunksRef = useRef([]),
-    timerRef = useRef(null);
-  const savedTimer = useRef(0),
-    savedDate = useRef("");
-  useEffect(() => {
-    if (recState === "recording") timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);else clearInterval(timerRef.current);
-    return () => clearInterval(timerRef.current);
-  }, [recState]);
-  const startRec = async () => {
-    if (mode === "interview" && !member) return;
-    if (!isOnline) {
-      setError("オフラインです。接続を確認してください。");
-      return;
-    }
-    setError(null);
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        audio: true
-      });
-      const mimeType = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'].find(t => {
-        try {
-          return MediaRecorder.isTypeSupported(t);
-        } catch (_e) {
-          return false;
-        }
-      }) || '';
-      const mr = new MediaRecorder(s, mimeType ? {
-        mimeType
-      } : {});
-      chunksRef.current = [];
-      mr.ondataavailable = e => e.data.size > 0 && chunksRef.current.push(e.data);
-      mr.onstop = () => {
-        s.getTracks().forEach(t => t.stop());
-        setStream(null);
-      };
-      mr.start(100);
-      mrRef.current = mr;
-      setStream(s);
-      setRecState("recording");
-      setTimer(0);
-      savedTimer.current = 0;
-    } catch (_e) {
-      alert("マイクへのアクセスを許可してください。");
-    }
-  };
-  const stopRec = () => {
-    savedTimer.current = timer;
-    savedDate.current = nowStr();
-    mrRef.current?.stop();
-    const blob = new Blob(chunksRef.current, {
-      type: mrRef.current?.mimeType || "audio/mp4"
-    });
-    const url = URL.createObjectURL(blob);
-    const localId = Date.now();
-    setLocalRecs(prev => [{
-      localId,
-      url,
-      date: savedDate.current,
-      duration: fmt(savedTimer.current || timer),
-      member: member || "",
-      interviewee: interviewee || "",
-      meetingName: meetingName || "",
-      mode,
-      processed: false,
-      sections: null,
-      id: null,
-      chunks: chunksRef.current.slice()
-    }, ...prev]);
-    setRecState("stopped");
-  };
-  const pauseRec = () => {
-    mrRef.current?.pause();
-    setRecState("paused");
-  };
-  const resumeRec = () => {
-    mrRef.current?.resume();
-    setRecState("recording");
-  };
-  const processRec = async rec => {
-    if (!isOnline) {
-      setError("オフラインです。接続を確認してください。");
-      return;
-    }
-    setProcessingId(rec.localId);
-    const cfg = PROMPTS[rec.mode];
-    try {
-      const blob = new Blob(rec.chunks, {
-        type: mrRef.current?.mimeType || "audio/mp4"
-      });
-      const b64 = await new Promise(res => {
-        const r = new FileReader();
-        r.onloadend = () => res(r.result.split(",")[1]);
-        r.readAsDataURL(blob);
-      });
-      const data = await gasPost({
-        action: "transcribe",
-        member: rec.member,
-        interviewee: rec.interviewee,
-        meetingName: rec.meetingName,
-        audio: b64,
-        mimeType: mrRef.current?.mimeType || "audio/mp4",
-        duration: rec.duration,
-        date: rec.date,
-        mode: rec.mode,
-        systemPrompt: cfg.systemPrompt
-      });
-      setLocalRecs(prev => prev.map(r => r.localId === rec.localId ? {
-        ...r,
-        processed: true,
-        sections: data.sections,
-        id: data.id
-      } : r));
-      if (newRecordForHistory) {
-        newRecordForHistory({
-          id: data.id,
-          date: rec.date,
-          duration: rec.duration,
-          member: rec.member,
-          interviewee: rec.interviewee,
-          meetingName: rec.meetingName,
-          mode: rec.mode,
-          sections: data.sections
-        });
-      }
-    } catch (e) {
-      setError("処理に失敗しました: " + e.message);
-    }
-    setProcessingId(null);
-  };
-  const deleteRec = id => {
-    setLocalRecs(prev => prev.filter(r => r.localId !== id));
-    setShowDelete(null);
-  };
-  const isActive = recState === "recording" || recState === "paused";
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      height: "100%"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
-      overflowY: "auto",
-      padding: "12px 16px 0",
-      paddingBottom: "260px"
-    }
-  }, error && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: `${C.red}12`,
-      border: `1px solid ${C.red}25`,
-      borderRadius: 10,
-      padding: "10px 12px",
-      marginBottom: 10,
-      fontSize: 13,
-      color: C.red,
-      display: "flex",
-      alignItems: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "circle-exclamation",
-    size: 14,
-    color: C.red
-  }), error, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setError(null),
-    style: {
-      marginLeft: "auto",
-      background: "none",
-      border: "none",
-      cursor: "pointer"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "xmark",
-    size: 13,
-    color: C.text2
-  }))), recState === "idle" && mode === "interview" && member && /*#__PURE__*/React.createElement(PrevRecordCard, {
-    member: member
-  }), localRecs.map(rec => /*#__PURE__*/React.createElement("div", {
-    key: rec.localId
-  }, showDelete === rec.localId ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.surface,
-      borderRadius: 14,
-      padding: 18,
-      marginBottom: 12,
-      border: `1px solid ${C.sep}`,
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 15,
-      fontWeight: 500,
-      color: C.text,
-      marginBottom: 5
-    }
-  }, "\u9332\u97F3\u3092\u524A\u9664\u3057\u307E\u3059\u304B\uFF1F"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 13,
-      color: C.text2,
-      marginBottom: 16
-    }
-  }, "\u3053\u306E\u64CD\u4F5C\u306F\u53D6\u308A\u6D88\u305B\u307E\u305B\u3093"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowDelete(null),
-    style: {
-      flex: 1,
-      padding: "11px 0",
-      borderRadius: 10,
-      background: C.bg,
-      border: `1px solid ${C.sep}`,
-      fontSize: 15,
-      color: C.text,
-      cursor: "pointer"
-    }
-  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => deleteRec(rec.localId),
-    style: {
-      flex: 1,
-      padding: "11px 0",
-      borderRadius: 10,
-      background: C.red,
-      border: "none",
-      fontSize: 15,
-      fontWeight: 600,
-      color: "#fff",
-      cursor: "pointer"
-    }
-  }, "\u524A\u9664"))) : /*#__PURE__*/React.createElement(RecordingCard, {
-    rec: rec,
-    onProcess: processRec,
-    onDelete: id => setShowDelete(id),
-    onViewSummary: setSelectedRec,
-    processing: !!processingId,
-    processingId: processingId
-  }))), localRecs.length === 0 && recState === "idle" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      paddingTop: 40,
-      paddingBottom: 20
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 52,
-      marginBottom: 12,
-      opacity: .12
-    }
-  }, "\uD83C\uDF99"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: C.text2,
-      fontSize: 14,
-      lineHeight: 1.7
-    }
-  }, mode === "meeting" ? meetingName || "会議モードで録音を開始します" : member ? "録音を開始してください" : "まずメンバーを選択してください"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.surface,
-      borderTop: `1px solid ${C.sep}`,
-      position: "fixed",
-      bottom: 0,
-      left: "50%",
-      transform: "translateX(-50%)",
-      width: "min(100%, 430px)",
-      zIndex: 20,
-      padding: "12px 16px 0",
-      paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
-      boxShadow: "0 -1px 8px rgba(0,0,0,0.06)"
-    }
-  }, !isActive && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 12
-    }
-  }, mode === "interview" ? /*#__PURE__*/React.createElement(React.Fragment, null, membersLoading ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: 44,
-      display: "flex",
-      alignItems: "center",
-      gap: 7,
-      color: C.text2,
-      fontSize: 14,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "spinner",
-    size: 13,
-    color: C.text2,
-    cls: "spin"
-  }), "\u8AAD\u307F\u8FBC\u307F\u4E2D...") : /*#__PURE__*/React.createElement("select", {
-    value: member,
-    onChange: e => setMember(e.target.value),
-    style: {
-      width: "100%",
-      background: C.bg,
-      color: C.text,
-      border: `1.5px solid ${member ? C.blue : C.sep}`,
-      borderRadius: 10,
-      padding: "11px 36px 11px 13px",
-      fontSize: 15,
-      outline: "none",
-      marginBottom: 8,
-      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238E8E93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
-      backgroundRepeat: "no-repeat",
-      backgroundPosition: "right 12px center"
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\u9762\u8AC7\u62C5\u5F53\u3092\u9078\u629E...\uFF08\u5165\u529B\u5FC5\u9808\uFF09"), members.map(m => /*#__PURE__*/React.createElement("option", {
-    key: m,
-    value: m
-  }, m))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "relative"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "user",
-    size: 13,
-    color: C.text2,
-    style: {
-      position: "absolute",
-      left: 12,
-      top: "50%",
-      transform: "translateY(-50%)"
-    }
-  }), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    value: interviewee,
-    onChange: e => setInterviewee(e.target.value),
-    placeholder: "\u76F8\u624B\uFF08\u4EFB\u610F\uFF09",
-    style: {
-      width: "100%",
-      background: C.bg,
-      color: C.text,
-      border: `1.5px solid ${C.sep}`,
-      borderRadius: 10,
-      padding: "11px 13px 11px 32px",
-      fontSize: 15,
-      outline: "none"
-    }
-  }))) : /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "relative"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "people-group",
-    size: 13,
-    color: C.text2,
-    style: {
-      position: "absolute",
-      left: 12,
-      top: "50%",
-      transform: "translateY(-50%)"
-    }
-  }), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    value: meetingName,
-    onChange: e => setMeetingName(e.target.value),
-    placeholder: "\u4F1A\u8B70\u540D\uFF08\u4EFB\u610F\uFF09",
-    style: {
-      width: "100%",
-      background: C.bg,
-      color: C.text,
-      border: `1.5px solid ${C.sep}`,
-      borderRadius: 10,
-      padding: "11px 13px 11px 32px",
-      fontSize: 15,
-      outline: "none"
-    }
-  }))), isActive && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      marginBottom: 6,
-      fontSize: 12
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: recState === "recording" ? C.red : C.text2,
-      fontWeight: 500
-    }
-  }, recState === "recording" ? "● 録音中" : "⏸ 一時停止中"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: C.text2,
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, fmt(timer))), /*#__PURE__*/React.createElement(Waveform, {
-    stream: stream,
-    paused: recState === "paused"
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 24,
-      position: "relative"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 44,
-      opacity: recState === "recording" ? 1 : 0,
-      transition: "opacity .2s",
-      pointerEvents: recState === "recording" ? "auto" : "none"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: pauseRec,
-    style: {
-      width: 44,
-      height: 44,
-      borderRadius: "50%",
-      background: C.bg,
-      border: `1px solid ${C.sep}`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      cursor: "pointer"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "pause",
-    size: 17,
-    color: C.text
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "relative"
-    }
-  }, recState === "recording" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "absolute",
-      inset: -8,
-      borderRadius: "50%",
-      background: `${C.red}22`,
-      animation: "pulse-ring 1.4s ease-out infinite"
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: isActive ? stopRec : startRec,
-    disabled: mode === "interview" && !member && !isActive,
-    style: {
-      width: 72,
-      height: 72,
-      position: "relative",
-      zIndex: 1,
-      borderRadius: isActive ? "22px" : "50%",
-      background: mode === "interview" && !member && !isActive ? `${C.red}40` : C.red,
-      border: "none",
-      cursor: mode === "interview" && !member && !isActive ? "default" : "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      boxShadow: isActive ? "none" : `0 4px 16px ${C.red}45`,
-      transition: "border-radius .35s cubic-bezier(.34,1.56,.64,1),box-shadow .3s"
-    }
-  }, isActive ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 26,
-      height: 26,
-      borderRadius: 6,
-      background: "#fff"
-    }
-  }) : /*#__PURE__*/React.createElement(Ic, {
-    n: "microphone",
-    size: 28,
-    color: "#fff"
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 44,
-      opacity: recState === "paused" ? 1 : 0,
-      transition: "opacity .2s",
-      pointerEvents: recState === "paused" ? "auto" : "none"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: resumeRec,
-    style: {
-      width: 44,
-      height: 44,
-      borderRadius: "50%",
-      background: `${C.green}15`,
-      border: `1px solid ${C.green}30`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      cursor: "pointer"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "play",
-    size: 16,
-    color: C.green,
-    style: {
-      marginLeft: 2
-    }
-  })))), /*#__PURE__*/React.createElement("p", {
-    style: {
-      textAlign: "center",
-      fontSize: 11,
-      color: C.text2,
-      marginTop: 6
-    }
-  }, recState === "recording" ? "タップして停止" : recState === "paused" ? "再開または停止" : recState === "stopped" ? "" : "タップして録音")), selectedRec && /*#__PURE__*/React.createElement(SummaryModal, {
-    item: selectedRec,
-    onClose: () => setSelectedRec(null),
-    onSectionsUpdated: newSecs => {
-      setSelectedRec(s => ({
-        ...s,
-        sections: newSecs
-      }));
-      setLocalRecs(rs => rs.map(r => r.localId === selectedRec.localId ? {
-        ...r,
-        sections: newSecs
-      } : r));
-    }
-  }));
-}
-
-// ================================================================
-// APP
+// APP ROOT
 // ================================================================
 function App() {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem(AUTH_KEY) === "1");
@@ -2925,7 +2987,7 @@ function App() {
     if (!authed) return;
     (async () => {
       setMembersLoading(true);
-      if (isFresh(CACHE.members, TTL.members)) {
+      if (isFresh(CACHE.members)) {
         setMembers(CACHE.members.data);
         setMembersLoading(false);
         return;
@@ -2940,7 +3002,7 @@ function App() {
           data: l,
           ts: Date.now()
         };
-      } catch (_e) {}
+      } catch {}
       setMembersLoading(false);
     })();
   }, [authed]);
@@ -2950,154 +3012,112 @@ function App() {
     setInterviewee("");
     setMeetingName("");
   };
-  if (!authed) return /*#__PURE__*/React.createElement(PinScreen, {
-    onSuccess: () => setAuthed(true)
-  });
-  return /*#__PURE__*/React.createElement("div", {
+  const handleLock = () => {
+    sessionStorage.removeItem(AUTH_KEY);
+    setAuthed(false);
+  };
+  if (!authed) return /*#__PURE__*/React.createElement("div", {
     style: {
+      position: "relative",
       width: "100%",
-      height: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      background: C.bg,
-      overflow: "hidden",
-      fontFamily: "-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif"
+      height: "100%",
+      background: C.bg
     }
-  }, /*#__PURE__*/React.createElement(DrawerMenu, {
-    open: drawerOpen,
-    onClose: () => setDrawerOpen(false),
-    onNavigate: k => setScreen(k === "home" ? "home" : "history"),
-    onLock: () => {
-      sessionStorage.removeItem(AUTH_KEY);
-      setAuthed(false);
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.surface,
-      borderBottom: `1px solid ${C.sep}`,
-      padding: "0 16px",
-      height: 52,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      flexShrink: 0
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setDrawerOpen(true),
-    style: {
-      width: 38,
-      height: 38,
-      borderRadius: 10,
-      background: C.bg,
-      border: "none",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "bars",
-    size: 18,
-    color: C.text
-  })), !isOnline && /*#__PURE__*/React.createElement("span", {
-    style: {
-      position: "absolute",
-      left: "50%",
-      transform: "translateX(-50%)",
-      fontSize: 11,
-      color: C.orange,
-      display: "flex",
-      alignItems: "center",
-      gap: 4
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "wifi-slash",
-    size: 11,
-    color: C.orange
-  }), "\u30AA\u30D5\u30E9\u30A4\u30F3"), /*#__PURE__*/React.createElement(ModeButton, {
-    mode: mode,
-    onModeChange: handleModeChange
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
-      overflow: "hidden",
-      display: "flex",
-      flexDirection: "column"
-    }
-  }, screen === "home" ? /*#__PURE__*/React.createElement(HomeScreen, {
-    mode: mode,
-    members: members,
-    membersLoading: membersLoading,
-    member: member,
-    setMember: setMember,
-    interviewee: interviewee,
-    setInterviewee: setInterviewee,
-    meetingName: meetingName,
-    setMeetingName: setMeetingName,
-    isOnline: isOnline,
-    newRecordForHistory: rec => setNewRecord({
-      ...rec,
-      _ts: Date.now()
-    })
-  }) : /*#__PURE__*/React.createElement(HistoryScreen, {
-    members: members,
-    newRecord: newRecord
-  })));
-}
-
-// ================================================================
-// MODE BUTTON (長押しで切替)
-// ================================================================
-function ModeButton({
-  mode,
-  onModeChange
-}) {
-  const timerRef = useRef(null);
-  const [pressing, setPressing] = useState(false);
-  const cfg = PROMPTS[mode];
-  const start = () => {
-    setPressing(true);
-    timerRef.current = setTimeout(() => {
-      onModeChange(mode === "interview" ? "meeting" : "interview");
-      setPressing(false);
-    }, 600);
-  };
-  const end = () => {
-    clearTimeout(timerRef.current);
-    setPressing(false);
-  };
-  return /*#__PURE__*/React.createElement("button", {
-    onMouseDown: start,
-    onMouseUp: end,
-    onTouchStart: start,
-    onTouchEnd: end,
-    onContextMenu: e => e.preventDefault(),
-    style: {
-      background: pressing ? cfg.badge.bg : `${cfg.badge.bg}`,
-      color: cfg.color,
-      border: `1px solid ${cfg.color}25`,
-      borderRadius: 20,
-      padding: "6px 13px",
-      fontSize: 12,
-      fontWeight: 600,
-      display: "flex",
-      alignItems: "center",
-      gap: 5,
-      cursor: "pointer",
-      transition: "transform .1s",
-      transform: pressing ? "scale(.96)" : "scale(1)"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: cfg.icon,
-    size: 12,
-    color: cfg.color
-  }), cfg.label, "\u30E2\u30FC\u30C9", /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      color: cfg.color,
-      opacity: .6
-    }
-  }, "\u9577\u62BC\u3057\u3067\u5207\u66FF"));
+  }, /*#__PURE__*/React.createElement(PinScreen, {
+    onSuccess: () => setAuthed(true)
+  }));
+  return (
+    /*#__PURE__*/
+    /* ★ 外側コンテナ：position:relative で子要素の absolute を制御
+         高さは #root（position:fixed;inset:0）によって決まる */
+    React.createElement("div", {
+      style: {
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: C.bg,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement(Drawer, {
+      open: drawerOpen,
+      onClose: () => setDrawerOpen(false),
+      onNav: k => setScreen(k === "home" ? "home" : "history"),
+      onLock: handleLock
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flexShrink: 0,
+        background: C.surface,
+        borderBottom: `1px solid ${C.sep}`,
+        padding: "0 16px",
+        height: 52,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setDrawerOpen(true),
+      style: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        background: C.bg,
+        border: "none",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "bars",
+      size: 18,
+      color: C.text
+    })), !isOnline && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: C.orange,
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        position: "absolute",
+        left: "50%",
+        transform: "translateX(-50%)"
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "wifi-slash",
+      size: 11,
+      color: C.orange
+    }), "\u30AA\u30D5\u30E9\u30A4\u30F3"), /*#__PURE__*/React.createElement(ModeButton, {
+      mode: mode,
+      onChange: handleModeChange
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column"
+      }
+    }, screen === "home" ? /*#__PURE__*/React.createElement(HomeScreen, {
+      mode: mode,
+      members: members,
+      membersLoading: membersLoading,
+      member: member,
+      setMember: setMember,
+      interviewee: interviewee,
+      setInterviewee: setInterviewee,
+      meetingName: meetingName,
+      setMeetingName: setMeetingName,
+      isOnline: isOnline,
+      onRecordSaved: rec => setNewRecord({
+        ...rec,
+        _ts: Date.now()
+      })
+    }) : /*#__PURE__*/React.createElement(HistoryScreen, {
+      members: members,
+      newRecord: newRecord
+    })))
+  );
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
 </script>
