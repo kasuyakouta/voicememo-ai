@@ -4,11 +4,28 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>VoiceMemo AI</title>
+
+  <!-- ▼ PWA 設定 (案B) ▼ -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- iOS Safari PWA 設定 -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="VoiceMemo AI" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <!-- テーマカラー（ブラウザUI） -->
+  <meta name="theme-color" content="#007AFF" />
+  <!-- ▲ PWA 設定 ▲ -->
+
+  <!-- Google Sign-In -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;-webkit-user-select:none;user-select:none}
     body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;color:#1C1C1E}
     button{-webkit-appearance:none;appearance:none;border:none;background:none;cursor:pointer;color:inherit}
-    input,select,textarea{-webkit-appearance:none;appearance:none;outline:none;font-family:inherit}
+    input,select,textarea{-webkit-appearance:none;appearance:none;outline:none;font-family:inherit;-webkit-user-select:text;user-select:text}
     select option{background:#fff;color:#1C1C1E}
     ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(60,60,67,.2);border-radius:4px}
     input[type=range]{-webkit-appearance:none;appearance:none;outline:none}
@@ -377,6 +394,11 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbwC91pYajGGtpATaa2ndoAK
 const CORRECT_PIN = "3150";
 const AUTH_KEY = "vm_auth_v1";
 const PAGE_SIZE = 20;
+// 9. Google ログイン：Google Cloud ConsoleでOAuthクライアントIDを取得して設定
+// 空のままではGoogle認証は無効（PINのみ有効）
+const GOOGLE_CLIENT_ID = "";
+// 10. Google Drive保存：LS_KEY_DRIVEでオン/オフ管理
+const LS_KEY_DRIVE = 'vm_drive_save_v1';
 
 // ================================================================
 // COLORS
@@ -434,8 +456,62 @@ const CACHE = {
   prev: new Map()
 };
 const TTL = 5 * 60 * 1000;
+const LS_KEY_MEMBERS = 'vm_members_v1';
+const LS_TTL = 24 * 60 * 60 * 1000; // 24時間
+
 function isFresh(e) {
   return e && Date.now() - e.ts < TTL;
+}
+
+// 2. 直前の入力を記憶
+const LS_KEY_LAST = 'vm_last_input_v1';
+const LS_KEY_AUTO = 'vm_auto_process_v1';
+function lsLoadLastInput() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_KEY_LAST) || '{}');
+  } catch {
+    return {};
+  }
+}
+function lsSaveLastInput(data) {
+  try {
+    localStorage.setItem(LS_KEY_LAST, JSON.stringify(data));
+  } catch {}
+}
+function lsLoadAutoProcess() {
+  try {
+    return localStorage.getItem(LS_KEY_AUTO) === '1';
+  } catch {
+    return false;
+  }
+}
+function lsSaveAutoProcess(v) {
+  try {
+    localStorage.setItem(LS_KEY_AUTO, v ? '1' : '0');
+  } catch {}
+}
+
+// localStorage からメンバー一覧を読み込む（24時間キャッシュ）
+function lsLoadMembers() {
+  try {
+    const raw = localStorage.getItem(LS_KEY_MEMBERS);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.ts > LS_TTL) return null; // 24時間超えたら無効
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+// localStorage にメンバー一覧を保存
+function lsSaveMembers(data) {
+  try {
+    localStorage.setItem(LS_KEY_MEMBERS, JSON.stringify({
+      data,
+      ts: Date.now()
+    }));
+  } catch {}
 }
 async function gasGet(p) {
   const r = await fetch(GAS_URL + "?" + new URLSearchParams(p));
@@ -467,6 +543,21 @@ function copyText(t) {
   } catch {
     return false;
   }
+}
+
+// 7. 相対日付表示
+function relDate(s) {
+  if (!s) return "";
+  const d = new Date(s.replace(" ", "T"));
+  if (isNaN(d)) return s;
+  const now = new Date();
+  const toDay = v => new Date(v.getFullYear(), v.getMonth(), v.getDate()).getTime();
+  const diff = (toDay(now) - toDay(d)) / 86400000;
+  const t = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (diff === 0) return `今日 ${t}`;
+  if (diff === 1) return `昨日 ${t}`;
+  if (diff < 7) return `${diff}日前 ${t}`;
+  return `${d.getMonth() + 1}/${d.getDate()} ${t}`;
 }
 
 // ================================================================
@@ -682,7 +773,54 @@ function PinScreen({
       fontSize: 13,
       color: C.red
     }
-  }, "PIN\u30B3\u30FC\u30C9\u304C\u9055\u3044\u307E\u3059"));
+  }, "PIN\u30B3\u30FC\u30C9\u304C\u9055\u3044\u307E\u3059"), GOOGLE_CLIENT_ID && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 24,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: C.text2,
+      marginBottom: 8
+    }
+  }, "\u307E\u305F\u306F"), /*#__PURE__*/React.createElement(GoogleLoginButton, {
+    onSuccess: onSuccess
+  })));
+}
+
+// ================================================================
+// 9. Google ログインコンポーネント（GOOGLE_CLIENT_ID設定時のみ使用）
+// ================================================================
+function GoogleLoginButton({
+  onSuccess
+}) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !window.google) return;
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: res => {
+        if (res.credential) {
+          sessionStorage.setItem(AUTH_KEY, "1");
+          onSuccess();
+        }
+      }
+    });
+    window.google.accounts.id.renderButton(ref.current, {
+      theme: "outline",
+      size: "large",
+      width: 280,
+      text: "signin_with"
+    });
+  }, []);
+  if (!GOOGLE_CLIENT_ID) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    ref: ref,
+    style: {
+      marginTop: 16
+    }
+  });
 }
 
 // ================================================================
@@ -816,6 +954,54 @@ function Drawer({
 }
 
 // ================================================================
+// TOGGLE ROW（再利用可能なトグルスイッチ行）
+// ================================================================
+function ToggleRow({
+  label,
+  value,
+  onChange
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "2px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: C.text2
+    }
+  }, label), /*#__PURE__*/React.createElement("button", {
+    onClick: onChange,
+    style: {
+      width: 36,
+      height: 20,
+      borderRadius: 10,
+      border: "none",
+      cursor: "pointer",
+      background: value ? C.blue : "rgba(120,120,128,.2)",
+      transition: "background .2s",
+      position: "relative",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 16,
+      height: 16,
+      borderRadius: "50%",
+      background: "#fff",
+      position: "absolute",
+      top: 2,
+      left: value ? 18 : 2,
+      transition: "left .2s",
+      boxShadow: "0 1px 3px rgba(0,0,0,.2)"
+    }
+  })));
+}
+
+// ================================================================
 // MODE BUTTON（長押しで切替）
 // ================================================================
 function ModeButton({
@@ -855,7 +1041,10 @@ function ModeButton({
       gap: 5,
       cursor: "pointer",
       transform: pressing ? "scale(.96)" : "scale(1)",
-      transition: "transform .1s"
+      transition: "transform .1s",
+      WebkitUserSelect: "none",
+      userSelect: "none",
+      WebkitTouchCallout: "none"
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: cfg.icon,
@@ -1035,7 +1224,12 @@ function AudioPlayer({
       justifyContent: "space-between",
       padding: "0 4px"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 36,
+      height: 36
+    }
+  }), /*#__PURE__*/React.createElement("button", {
     onClick: () => skip(-15),
     style: {
       display: "flex",
@@ -1061,13 +1255,13 @@ function AudioPlayer({
       width: 52,
       height: 52,
       borderRadius: "50%",
-      background: C.red,
+      background: C.text,
       border: "none",
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      boxShadow: `0 2px 8px ${C.red}45`
+      boxShadow: "0 2px 8px rgba(0,0,0,.18)"
     }
   }, /*#__PURE__*/React.createElement(Ic, {
     n: playing ? "pause" : "play",
@@ -1188,10 +1382,17 @@ function EditableSummary({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const cfg = PROMPTS[mode] || PROMPTS.meeting;
+  const [collapsed, setCollapsed] = useState(new Set()); // 6. 折りたたみ状態
+  const toggleCollapse = key => setCollapsed(s => {
+    const n = new Set(s);
+    n.has(key) ? n.delete(key) : n.add(key);
+    return n;
+  });
   const startEdit = () => {
     setDraft(JSON.parse(JSON.stringify(sections)));
     setEditing(true);
     setMsg(null);
+    setCollapsed(new Set());
   };
   const cancel = () => {
     setDraft(null);
@@ -1315,13 +1516,18 @@ function EditableSummary({
       border: `1px solid ${C.sep}`,
       marginBottom: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => !editing && toggleCollapse(sec.key),
     style: {
+      width: "100%",
       padding: "8px 12px",
       background: C.bg,
       display: "flex",
       alignItems: "center",
-      gap: 6
+      gap: 6,
+      border: "none",
+      cursor: editing ? "default" : "pointer",
+      textAlign: "left"
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -1333,13 +1539,20 @@ function EditableSummary({
       fontWeight: 600,
       color: C.text
     }
-  }, sec.label), editing && /*#__PURE__*/React.createElement("span", {
+  }, sec.label), editing ? /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: C.text2,
       marginLeft: "auto"
     }
-  }, "\u7DE8\u96C6\u4E2D")), /*#__PURE__*/React.createElement("div", {
+  }, "\u7DE8\u96C6\u4E2D") : /*#__PURE__*/React.createElement(Ic, {
+    n: collapsed.has(sec.key) ? "chevron-down" : "chevron-up",
+    size: 12,
+    color: C.text2,
+    style: {
+      marginLeft: "auto"
+    }
+  })), !collapsed.has(sec.key) && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "8px 12px 10px",
       background: C.surface
@@ -1630,7 +1843,7 @@ function SummaryModal({
       fontSize: 11,
       color: C.text2
     }
-  }, item.date, " \xB7 ", item.duration)), /*#__PURE__*/React.createElement("button", {
+  }, relDate(item.date), " \xB7 ", item.duration)), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       width: 32,
@@ -1863,7 +2076,7 @@ function RecordingCard({
       fontSize: 11,
       color: C.text2
     }
-  }, rec.date, " \xB7 ", rec.duration)), rec.url && /*#__PURE__*/React.createElement(AudioPlayer, {
+  }, relDate(rec.date), " \xB7 ", rec.duration)), rec.url && /*#__PURE__*/React.createElement(AudioPlayer, {
     url: rec.url,
     onDelete: () => onDelete(rec.localId)
   }), rec.url && !rec.processed && /*#__PURE__*/React.createElement("div", {
@@ -1969,12 +2182,53 @@ function HomeScreen({
   const [selectedRec, setSelectedRec] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [error, setError] = useState(null);
+  // 1. 自動AI処理
+  const [autoProcess, setAutoProcess] = useState(() => lsLoadAutoProcess());
+  // 10. Google Drive保存
+  const [driveSave, setDriveSave] = useState(() => {
+    try {
+      return localStorage.getItem(LS_KEY_DRIVE) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleDriveSave = () => {
+    const v = !driveSave;
+    setDriveSave(v);
+    try {
+      localStorage.setItem(LS_KEY_DRIVE, v ? '1' : '0');
+    } catch {}
+  };
+  // 5. 最近の履歴
+  const [recentRecs, setRecentRecs] = useState([]);
   const mrRef = useRef(null),
     chunksRef = useRef([]),
     timerRef = useRef(null);
   const savedTimer = useRef(0),
     savedDate = useRef(""),
     contentRef = useRef(null);
+
+  // 2. 直前の入力を復元（初回マウント時のみ）
+  useEffect(() => {
+    const last = lsLoadLastInput();
+    if (last.member) setMember(last.member);
+    if (last.interviewee) setInterviewee(last.interviewee);
+    if (last.meetingName) setMeetingName(last.meetingName);
+  }, []);
+
+  // 5. 最近の履歴3件を取得
+  useEffect(() => {
+    (async () => {
+      try {
+        const d = await gasGet({
+          action: "getHistory",
+          limit: 3,
+          offset: 0
+        });
+        setRecentRecs(d.records || []);
+      } catch {}
+    })();
+  }, []);
   useEffect(() => {
     if (recState === "recording") timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);else clearInterval(timerRef.current);
     return () => clearInterval(timerRef.current);
@@ -2034,7 +2288,7 @@ function HomeScreen({
     });
     const url = URL.createObjectURL(blob);
     const localId = Date.now();
-    setLocalRecs(prev => [...prev, {
+    const newRec = {
       localId,
       url,
       date: savedDate.current,
@@ -2047,8 +2301,17 @@ function HomeScreen({
       sections: null,
       id: null,
       chunks: [...chunksRef.current]
-    }]);
+    };
+    setLocalRecs(prev => [...prev, newRec]);
     setRecState("stopped");
+    // 2. 直前の入力を保存
+    lsSaveLastInput({
+      member,
+      interviewee,
+      meetingName
+    });
+    // 1. 自動AI処理
+    if (autoProcess) setTimeout(() => processRec(newRec), 300);
   };
   const pauseRec = () => {
     mrRef.current?.pause();
@@ -2078,6 +2341,7 @@ function HomeScreen({
         member: rec.member,
         interviewee: rec.interviewee,
         meetingName: rec.meetingName,
+        saveToDrive: driveSave,
         audio: b64,
         mimeType: mrRef.current?.mimeType || "audio/mp4",
         duration: rec.duration,
@@ -2110,6 +2374,11 @@ function HomeScreen({
   const deleteRec = id => {
     setLocalRecs(prev => prev.filter(r => r.localId !== id));
     setConfirmDelete(null);
+  };
+  const toggleAutoProcess = () => {
+    const v = !autoProcess;
+    setAutoProcess(v);
+    lsSaveAutoProcess(v);
   };
   const isActive = recState === "recording" || recState === "paused";
   const canRecord = mode === "meeting" || !!member;
@@ -2180,22 +2449,25 @@ function HomeScreen({
     color: C.text2
   }))), recState === "idle" && mode === "interview" && member && /*#__PURE__*/React.createElement(PrevRecordCard, {
     member: member
-  }), localRecs.length === 0 && recState !== "recording" && recState !== "paused" ?
-  /*#__PURE__*/
-  /* 空状態：flex:1で上下中央に */
-  React.createElement("div", {
+  }), localRecs.length === 0 && recState !== "recording" && recState !== "paused" ? /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
+      display: "flex",
+      flexDirection: "column"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      padding: "20px 0"
+      padding: "20px 0",
+      flex: recentRecs.length > 0 ? 0 : 1
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 52,
-      marginBottom: 12,
+      fontSize: 42,
+      marginBottom: 10,
       opacity: .1
     }
   }, "\uD83C\uDF99"), /*#__PURE__*/React.createElement("p", {
@@ -2205,7 +2477,100 @@ function HomeScreen({
       lineHeight: 1.7,
       textAlign: "center"
     }
-  }, mode === "meeting" ? meetingName || "会議モードで録音を開始します" : member ? "録音を開始してください" : "まずメンバーを選択してください")) : localRecs.map(rec => /*#__PURE__*/React.createElement("div", {
+  }, mode === "meeting" ? meetingName || "会議モードで録音を開始します" : member ? "録音を開始してください" : "まずメンバーを選択してください")), recentRecs.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: C.text2,
+      marginBottom: 8
+    }
+  }, "\u6700\u8FD1\u306E\u8A18\u9332"), recentRecs.map(item => {
+    const cfg = PROMPTS[item.mode] || PROMPTS.meeting;
+    const title = item.mode === "meeting" ? item.meetingName || "会議" : `${item.member}${item.interviewee ? " → " + item.interviewee : ""}`;
+    const fs = item.sections?.sections?.[0];
+    return /*#__PURE__*/React.createElement("button", {
+      key: item.id,
+      onClick: () => setSelectedRec(item),
+      style: {
+        width: "100%",
+        background: C.surface,
+        borderRadius: 12,
+        padding: "11px 13px",
+        border: `1px solid ${C.sep}`,
+        marginBottom: 8,
+        textAlign: "left",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        boxShadow: "0 1px 3px rgba(0,0,0,.04)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 36,
+        height: 36,
+        borderRadius: 9,
+        background: cfg.badge.bg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: cfg.icon,
+      size: 16,
+      color: cfg.color
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        marginBottom: 2
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: C.text,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      }
+    }, title), /*#__PURE__*/React.createElement(ModeBadge, {
+      mode: item.mode,
+      small: true
+    })), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 11,
+        color: C.text2,
+        marginBottom: fs ? 2 : 0
+      }
+    }, relDate(item.date), " \xB7 ", item.duration), fs && /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 11,
+        color: C.text2,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      }
+    }, fs.emoji, " ", fs.items[0])), /*#__PURE__*/React.createElement(Ic, {
+      n: "chevron-right",
+      size: 12,
+      color: C.text3,
+      style: {
+        flexShrink: 0
+      }
+    }));
+  }))) : localRecs.map(rec => /*#__PURE__*/React.createElement("div", {
     key: rec.localId
   }, confirmDelete === rec.localId ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2358,18 +2723,35 @@ function HomeScreen({
     style: {
       display: "flex",
       justifyContent: "space-between",
-      marginBottom: 6,
-      fontSize: 12
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
+      fontSize: 12,
       color: recState === "recording" ? C.red : C.text2,
-      fontWeight: 500
+      fontWeight: 600
     }
-  }, recState === "recording" ? "● 録音中" : "⏸ 一時停止中"), /*#__PURE__*/React.createElement("span", {
+  }, recState === "recording" ? "● 録音中" : "⏸ 一時停止中"), (member || meetingName) && /*#__PURE__*/React.createElement("span", {
     style: {
+      fontSize: 12,
+      color: C.text2
+    }
+  }, mode === "meeting" ? meetingName || "会議" : `${member}${interviewee ? " → " + interviewee : ""}`), /*#__PURE__*/React.createElement(ModeBadge, {
+    mode: mode,
+    small: true
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
       color: C.text2,
-      fontVariantNumeric: "tabular-nums"
+      fontVariantNumeric: "tabular-nums",
+      fontWeight: 500
     }
   }, fmt(timer))), /*#__PURE__*/React.createElement(Waveform, {
     stream: stream,
@@ -2480,7 +2862,23 @@ function HomeScreen({
       color: C.text2,
       marginTop: 6
     }
-  }, recState === "recording" ? "タップして停止" : recState === "paused" ? "再開または停止" : recState === "stopped" ? "" : "タップして録音")), selectedRec && /*#__PURE__*/React.createElement(SummaryModal, {
+  }, recState === "recording" ? "タップして停止" : recState === "paused" ? "再開または停止" : recState === "stopped" ? "" : "タップして録音"), recState === "idle" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+      marginTop: 8,
+      padding: "0 4px"
+    }
+  }, /*#__PURE__*/React.createElement(ToggleRow, {
+    label: "\u9332\u97F3\u505C\u6B62\u5F8C\u306B\u81EA\u52D5\u3067\u8981\u7D04",
+    value: autoProcess,
+    onChange: toggleAutoProcess
+  }), /*#__PURE__*/React.createElement(ToggleRow, {
+    label: "\u97F3\u58F0\u3092Drive\u306B\u81EA\u52D5\u4FDD\u5B58",
+    value: driveSave,
+    onChange: toggleDriveSave
+  }))), selectedRec && /*#__PURE__*/React.createElement(SummaryModal, {
     item: selectedRec,
     onClose: () => setSelectedRec(null),
     onSaved: newSecs => {
@@ -2874,7 +3272,7 @@ function HistoryScreen({
         color: C.text2,
         marginBottom: 3
       }
-    }, item.date), fs && /*#__PURE__*/React.createElement("p", {
+    }, relDate(item.date)), fs && /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 12,
         color: C.text2,
@@ -2938,6 +3336,8 @@ function App() {
   const [interviewee, setInterviewee] = useState("");
   const [meetingName, setMeetingName] = useState("");
   const [newRecord, setNewRecord] = useState(null);
+  const [resetKey, setResetKey] = useState(0); // 新規録音リセット用
+
   useEffect(() => {
     const on = () => setIsOnline(true),
       off = () => setIsOnline(false);
@@ -2951,12 +3351,22 @@ function App() {
   useEffect(() => {
     if (!authed) return;
     (async () => {
-      setMembersLoading(true);
-      if (isFresh(CACHE.members)) {
-        setMembers(CACHE.members.data);
+      // ① まず localStorage から即座に表示（ローディング不要）
+      const lsCached = lsLoadMembers();
+      if (lsCached && lsCached.length > 0) {
+        setMembers(lsCached);
         setMembersLoading(false);
-        return;
+        // メモリキャッシュも更新
+        CACHE.members = {
+          data: lsCached,
+          ts: Date.now()
+        };
       }
+
+      // ② メモリキャッシュが新鮮なら終了（GASリクエスト不要）
+      if (isFresh(CACHE.members)) return;
+
+      // ③ バックグラウンドでGASから最新データを取得・更新
       try {
         const d = await gasGet({
           action: "getMembers"
@@ -2967,8 +3377,11 @@ function App() {
           data: l,
           ts: Date.now()
         };
-      } catch {}
-      setMembersLoading(false);
+        lsSaveMembers(l); // localStorage に保存（次回即時表示用）
+        if (!lsCached || lsCached.length === 0) setMembersLoading(false);
+      } catch {
+        if (!lsCached) setMembersLoading(false);
+      }
     })();
   }, [authed]);
   const handleModeChange = m => {
@@ -3008,7 +3421,15 @@ function App() {
     }, /*#__PURE__*/React.createElement(Drawer, {
       open: drawerOpen,
       onClose: () => setDrawerOpen(false),
-      onNav: k => setScreen(k === "home" ? "home" : "history"),
+      onNav: k => {
+        setScreen(k === "home" ? "home" : "history");
+        if (k === "home") {
+          setResetKey(n => n + 1);
+          setMember("");
+          setInterviewee("");
+          setMeetingName("");
+        }
+      },
       onLock: handleLock
     }), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3064,6 +3485,7 @@ function App() {
         flexDirection: "column"
       }
     }, screen === "home" ? /*#__PURE__*/React.createElement(HomeScreen, {
+      key: resetKey,
       mode: mode,
       members: members,
       membersLoading: membersLoading,
@@ -3086,5 +3508,16 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
 </script>
+<!-- ▼ Service Worker 登録 (案B) ▼ -->
+<script>
+if ('serviceWorker' in navigator && !location.hostname.includes('claudeusercontent')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[SW] 登録完了:', reg.scope))
+      .catch(() => {}); // 404等は無視
+  });
+}
+</script>
+<!-- ▲ Service Worker 登録 ▲ -->
 </body>
 </html>
