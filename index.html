@@ -2183,7 +2183,7 @@ function HomeScreen({
       try {
         const d = await gasGet({
           action: "getHistory",
-          limit: 3,
+          limit: 1,
           offset: 0
         });
         setRecentRecs(d.records || []);
