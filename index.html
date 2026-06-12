@@ -602,7 +602,6 @@ function ModeBadge({
     style: {
       display: "inline-flex",
       alignItems: "center",
-      gap: 4,
       fontSize: small ? 10 : 11,
       fontWeight: 600,
       background: c.badge.bg,
@@ -610,11 +609,7 @@ function ModeBadge({
       padding: small ? "1px 7px" : "2px 9px",
       borderRadius: 20
     }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: c.icon,
-    size: small ? 9 : 10,
-    color: c.badge.text
-  }), c.label);
+  }, c.label);
 }
 
 // ================================================================
@@ -903,21 +898,7 @@ function Drawer({
       cursor: "pointer",
       textAlign: "left"
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 38,
-      height: 38,
-      borderRadius: 10,
-      background: item.key === "home" ? `${C.red}15` : C.bg,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: item.icon,
-    size: 17,
-    color: item.key === "home" ? C.red : C.text2
-  })), /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 16,
       fontWeight: 500,
@@ -1041,16 +1022,9 @@ function ModeButton({
       gap: 5,
       cursor: "pointer",
       transform: pressing ? "scale(.96)" : "scale(1)",
-      transition: "transform .1s",
-      WebkitUserSelect: "none",
-      userSelect: "none",
-      WebkitTouchCallout: "none"
+      transition: "transform .1s"
     }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: cfg.icon,
-    size: 12,
-    color: cfg.color
-  }), cfg.label, "\u30E2\u30FC\u30C9", /*#__PURE__*/React.createElement("span", {
+  }, cfg.label, "\u30E2\u30FC\u30C9", /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 9,
       opacity: .6
@@ -1531,10 +1505,6 @@ function EditableSummary({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 15
-    }
-  }, sec.emoji), /*#__PURE__*/React.createElement("span", {
-    style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.text
@@ -2009,12 +1979,7 @@ function PrevRecordCard({
       color: C.text,
       lineHeight: 1.6
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: C.purple,
-      flexShrink: 0
-    }
-  }, "\uD83D\uDCC5"), /*#__PURE__*/React.createElement("span", null, item)))));
+  }, /*#__PURE__*/React.createElement("span", null, item)))));
 }
 
 // ================================================================
@@ -2130,10 +2095,6 @@ function RecordingCard({
       padding: "3px 0"
     }
   }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13
-    }
-  }, sec.emoji), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       color: C.text2,
@@ -2464,13 +2425,7 @@ function HomeScreen({
       padding: "20px 0",
       flex: recentRecs.length > 0 ? 0 : 1
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 42,
-      marginBottom: 10,
-      opacity: .1
-    }
-  }, "\uD83C\uDF99"), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("p", {
     style: {
       color: C.text2,
       fontSize: 14,
@@ -2510,21 +2465,6 @@ function HomeScreen({
         boxShadow: "0 1px 3px rgba(0,0,0,.04)"
       }
     }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 36,
-        height: 36,
-        borderRadius: 9,
-        background: cfg.badge.bg,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0
-      }
-    }, /*#__PURE__*/React.createElement(Ic, {
-      n: cfg.icon,
-      size: 16,
-      color: cfg.color
-    })), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -3203,21 +3143,6 @@ function HistoryScreen({
         gap: 11
       }
     }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 42,
-        height: 42,
-        borderRadius: 11,
-        background: cfg.badge.bg,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0
-      }
-    }, /*#__PURE__*/React.createElement(Ic, {
-      n: cfg.icon,
-      size: 19,
-      color: cfg.color
-    })), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
