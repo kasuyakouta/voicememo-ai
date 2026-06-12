@@ -39,8 +39,8 @@
       display:flex;
       background:#1C1C1E;
       border-bottom:1px solid rgba(255,255,255,.1);
-      padding:0 20px;
-      height:52px;
+      padding:0 16px;
+      height:48px;
       align-items:center;
       justify-content:space-between;
       flex-shrink:0;
@@ -1781,7 +1781,8 @@ function RecordPanel({
       display: "flex",
       flexDirection: "column",
       height: "100%",
-      padding: "0 0 20px"
+      width: "100%",
+      padding: "0 0 env(safe-area-inset-bottom, 20px)"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1889,9 +1890,11 @@ function RecordPanel({
       flex: 1,
       padding: "0 20px",
       overflowY: "auto",
+      alignSelf: "stretch",
       display: "flex",
       flexDirection: "column",
-      justifyContent: !isStopped ? "center" : "flex-start"
+      justifyContent: !isStopped ? "center" : "flex-start",
+      alignItems: "center"
     }
   }, recState === "idle" && mode === "interview" && member && /*#__PURE__*/React.createElement(PrevRecordCard, {
     member: member
@@ -2186,7 +2189,9 @@ function RecordPanel({
       alignItems: "center",
       gap: 8,
       paddingTop: 12,
-      flexShrink: 0
+      flexShrink: 0,
+      alignItems: "center",
+      width: "100%"
     }
   }, isStopped && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
@@ -2887,39 +2892,43 @@ function App() {
   }, !isOnline && /*#__PURE__*/React.createElement(OfflineBanner, null), /*#__PURE__*/React.createElement("div", {
     className: "app-header"
   },
-  /* 左：アプリ名 */
-  React.createElement("span", {
-    style: {fontSize:13, fontWeight:700, color:"rgba(255,255,255,.6)", letterSpacing:0.3}
-  }, "VoiceMemo AI"),
+  /* 左：オフライン表示（幅確保用・非表示時も空div） */
+  React.createElement("div", {style:{width:32,display:"flex",alignItems:"center"}},
+    !isOnline && React.createElement(Ic, {n:"wifi-slash", size:14, color:"#FF9F0A"})
+  ),
 
-  /* 中央：文字タブ */
-  React.createElement("div", {
-    style: {display:"flex", background:"rgba(255,255,255,.1)", borderRadius:10, padding:2, gap:2}
-  },
-    [["record","録音"],["history","履歴"]].map(([k,label]) =>
-      React.createElement("button", {
-        key: k,
-        onClick: () => setTab(k),
-        style: {
-          padding:"6px 18px", borderRadius:8, border:"none", cursor:"pointer",
-          fontSize:13, fontWeight:600,
-          background: tab===k ? "#fff" : "transparent",
-          color:       tab===k ? "#1C1C1E" : "rgba(255,255,255,.5)",
-          transition:"all .2s"
-        }
-      }, label)
+  /* 中央：文字タブ（flex:1 で完全中央） */
+  React.createElement("div", {style:{display:"flex",justifyContent:"center"}},
+    React.createElement("div", {
+      style: {display:"flex", background:"rgba(255,255,255,.12)", borderRadius:10, padding:2, gap:2}
+    },
+      [["record","録音"],["history","履歴"]].map(([k,label]) =>
+        React.createElement("button", {
+          key: k,
+          onClick: () => setTab(k),
+          style: {
+            padding:"6px 22px", borderRadius:8, border:"none", cursor:"pointer",
+            fontSize:14, fontWeight:600,
+            background: tab===k ? "#fff" : "transparent",
+            color:       tab===k ? "#1C1C1E" : "rgba(255,255,255,.5)",
+            transition:"all .18s"
+          }
+        }, label)
+      )
     )
   ),
 
-  /* 右：オフライン表示 ＋ ロック */
-  React.createElement("div", {style:{display:"flex",alignItems:"center",gap:10}},
-    !isOnline && React.createElement(Ic, {n:"wifi-slash", size:14, color:"#FF9F0A"}),
+  /* 右：ロックアイコンのみ（テキスト非表示） */
+  React.createElement("div", {style:{width:32,display:"flex",alignItems:"center",justifyContent:"flex-end"}},
     React.createElement("button", {
       onClick: () => { sessionStorage.removeItem(AUTH_KEY); setAuthed(false); },
-      style: {fontSize:12, color:"rgba(255,255,255,.35)", display:"flex", alignItems:"center", gap:4}
+      style: {
+        width:32, height:32, borderRadius:"50%",
+        background:"rgba(255,255,255,.08)",
+        display:"flex", alignItems:"center", justifyContent:"center"
+      }
     },
-      React.createElement(Ic, {n:"lock", size:11, color:"rgba(255,255,255,.35)"}),
-      "ロック"
+      React.createElement(Ic, {n:"lock", size:14, color:"rgba(255,255,255,.4)"})
     )
   ), /*#__PURE__*/React.createElement("div", {
     className: "app-layout"
