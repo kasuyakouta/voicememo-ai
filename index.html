@@ -768,61 +768,73 @@ function GoogleLoginButton({
   onSuccess
 }) {
   const [loading, setLoading] = useState(false);
-  // useRef でコールバックを保持（クロージャ問題を回避）
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
+  const initializedRef = useRef(false);
+
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
+
+    const handleCredential = res => {
+      if (!res.credential) return;
+      const payload = parseJwt(res.credential);
+      const email = payload.email || "";
+      if (!email.endsWith("@kk-saikoh.co.jp")) {
+        alert("\u793e\u5185\u30a2\u30ab\u30a6\u30f3\u30c8\uff08@kk-saikoh.co.jp\uff09\u3067\u30ed\u30b0\u30a4\u30f3\u3057\u3066\u304f\u3060\u3055\u3044\u3002\n\u73fe\u5728\u306e\u30a2\u30ab\u30a6\u30f3\u30c8\uff1a" + email);
+        window.google?.accounts?.id?.disableAutoSelect();
+        setLoading(false);
+        return;
+      }
+      const userInfo = {
+        name: payload.name || "",
+        email,
+        picture: payload.picture || ""
+      };
+      sessionStorage.setItem(AUTH_KEY, "1");
+      sessionStorage.setItem("vm_user", JSON.stringify(userInfo));
+      setLoading(false);
+      onSuccessRef.current(userInfo);
+    };
+
     const doInit = () => {
+      if (initializedRef.current) return;
       if (!window.google?.accounts?.id) return;
+      initializedRef.current = true;
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         auto_select: true,
-        callback: res => {
-          if (!res.credential) return;
-          const payload = parseJwt(res.credential);
-          const email = payload.email || "";
-          if (!email.endsWith("@kk-saikoh.co.jp")) {
-            alert("社内アカウント（@kk-saikoh.co.jp）でログインしてください。\n現在のアカウント：" + email);
-            window.google.accounts.id.disableAutoSelect();
-            setLoading(false);
-            return;
-          }
-          const userInfo = {
-            name: payload.name || "",
-            email,
-            picture: payload.picture || ""
-          };
-          sessionStorage.setItem(AUTH_KEY, "1");
-          sessionStorage.setItem("vm_user", JSON.stringify(userInfo));
-          // ④ アクセストークンを保存（Drive直接アップロード用）
-          // Note: JWTのcredentialはIDトークン。アクセストークンはOAuth2フローで別途取得が必要
-          // 今はGASバイパス方式でfileIdだけ送る構成にする
-          setLoading(false);
-          onSuccessRef.current(userInfo);
-        }
+        callback: handleCredential
       });
+      window.google.accounts.id.prompt();
     };
 
-    // ① ライブラリ読み込み完了時のグローバルコールバックを登録
-    window.__gsiCallback = doInit;
-    // ② すでに読み込み済みなら即初期化
-    if (window.google?.accounts?.id) doInit();
+    window.__gsiCallback = () => setTimeout(doInit, 100);
+    let retries = 0;
+    const poll = setInterval(() => {
+      if (window.google?.accounts?.id) {
+        clearInterval(poll);
+        doInit();
+      } else if (++retries >= 20) {
+        clearInterval(poll);
+      }
+    }, 500);
+
     return () => {
+      clearInterval(poll);
       window.__gsiCallback = null;
     };
   }, []);
+
   const handleClick = () => {
     if (!window.google?.accounts?.id) {
-      alert("Googleのログインを読み込み中です。しばらくお待ちください。");
+      alert("Google\u306e\u30ed\u30b0\u30a4\u30f3\u3092\u8aad\u307f\u8fbc\u307f\u4e2d\u3067\u3059\u3002\u5c11\u3057\u5f85\u3063\u3066\u304b\u3089\u518d\u5ea6\u30bf\u30c3\u30d7\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
       return;
     }
     setLoading(true);
     window.google.accounts.id.prompt();
   };
-  if (!GOOGLE_CLIENT_ID) return null;
 
-  // ボタンは常に即座に表示（ライブラリ読み込み完了を待たない）
+  if (!GOOGLE_CLIENT_ID) return null;
   return /*#__PURE__*/React.createElement("button", {
     onClick: handleClick,
     disabled: loading,
@@ -859,12 +871,9 @@ function GoogleLoginButton({
   }), /*#__PURE__*/React.createElement("path", {
     fill: "#EA4335",
     d: "M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z"
-  })), loading ? "ログイン中..." : "Googleでログイン");
+  })), loading ? "\u30ed\u30b0\u30a4\u30f3\u4e2d..." : "Google\u3067\u30ed\u30b0\u30a4\u30f3");
 }
 
-// ================================================================
-// DRAWER
-// ================================================================
 function Drawer({
   open,
   onClose,
