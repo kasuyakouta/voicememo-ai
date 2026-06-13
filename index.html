@@ -2880,24 +2880,24 @@ function SwipeableItem({
     onTouchStart: onTouchStart,
     onTouchMove: onTouchMove,
     onTouchEnd: onTouchEnd
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.surface,
+      borderRadius: 14,
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 3px rgba(0,0,0,.04)",
+      display: "flex",
+      alignItems: "center"
+    }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: handleTap,
     style: {
-      width: "100%",
-      background: C.surface,
-      borderRadius: 14,
-      padding: "13px 14px",
-      border: `1px solid ${C.sep}`,
+      flex: 1,
+      padding: "13px 0 13px 14px",
       textAlign: "left",
       cursor: "pointer",
-      boxShadow: "0 1px 3px rgba(0,0,0,.04)",
-      display: "flex",
-      alignItems: "center",
-      gap: 11
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1,
+      background: "none",
+      border: "none",
       minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -2958,14 +2958,27 @@ function SwipeableItem({
       overflow: "hidden",
       textOverflow: "ellipsis"
     }
-  }, item.sections.sections[0].items[0])), /*#__PURE__*/React.createElement(Ic, {
-    n: "chevron-right",
-    size: 13,
-    color: C.text3,
+  }, item.sections.sections[0].items[0])), /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      onDelete(item);
+    },
     style: {
-      flexShrink: 0
+      padding: "0 14px",
+      height: "100%",
+      display: "flex",
+      alignItems: "center",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      flexShrink: 0,
+      borderLeft: `1px solid ${C.sep}`
     }
-  }))));
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "trash",
+    size: 15,
+    color: C.text2
+  })))));
 }
 
 // ================================================================
@@ -3081,7 +3094,8 @@ function DeleteConfirmModal({
 // ================================================================
 function HistoryScreen({
   members,
-  newRecord
+  newRecord,
+  memberFilter
 }) {
   const [records, setRecords] = useState([]);
   const [total, setTotal] = useState(0);
@@ -3102,11 +3116,14 @@ function HistoryScreen({
     setInitLoad(true);
     setError(null);
     try {
-      const d = await gasGet({
+      // 自分の履歴のみ取得（memberフィルタ）
+      const params = {
         action: "getHistory",
         limit: PAGE_SIZE,
         offset: 0
-      });
+      };
+      if (memberFilter) params.member = memberFilter;
+      const d = await gasGet(params);
       setRecords(d.records || []);
       setTotal(d.total || 0);
       setHasMore(d.hasMore || false);
@@ -3115,16 +3132,18 @@ function HistoryScreen({
       setError("履歴の取得に失敗しました: " + e.message);
     }
     setInitLoad(false);
-  }, []);
+  }, [memberFilter]);
   const fetchMore = async () => {
     if (moreLoad || !hasMore) return;
     setMoreLoad(true);
     try {
-      const d = await gasGet({
+      const params = {
         action: "getHistory",
         limit: PAGE_SIZE,
         offset: offsetRef.current
-      });
+      };
+      if (memberFilter) params.member = memberFilter;
+      const d = await gasGet(params);
       setRecords(prev => {
         const ids = new Set(prev.map(r => r.id));
         return [...prev, ...(d.records || []).filter(r => !ids.has(r.id))];
@@ -3180,7 +3199,7 @@ function HistoryScreen({
     ob.observe(sentinelRef.current);
     return () => ob.disconnect();
   }, [hasMore, moreLoad]);
-  const filtered = records.filter(item => (filterMem === "ALL" || item.member === filterMem) && (filterMode === "ALL" || item.mode === filterMode) && (!q || (item.sections?._transcript || "").includes(q) || (item.sections?.sections || []).some(s => s.items.some(i => i.includes(q))) || (item.member || "").includes(q) || (item.interviewee || "").includes(q) || (item.meetingName || "").includes(q)));
+  const filtered = records.filter(item => (filterMode === "ALL" || item.mode === filterMode) && (!q || (item.sections?._transcript || "").includes(q) || (item.sections?.sections || []).some(s => s.items.some(i => i.includes(q))) || (item.member || "").includes(q) || (item.interviewee || "").includes(q) || (item.meetingName || "").includes(q)));
   const handleSaved = newSecs => {
     setSelected(s => ({
       ...s,
@@ -3296,28 +3315,6 @@ function HistoryScreen({
     size: 13,
     color: C.text2
   }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 6,
-      overflowX: "auto",
-      paddingBottom: 10
-    }
-  }, ["ALL", ...members].map(m => /*#__PURE__*/React.createElement("button", {
-    key: m,
-    onClick: () => setFilterMem(m),
-    style: {
-      padding: "4px 12px",
-      borderRadius: 16,
-      fontSize: 12,
-      fontWeight: 500,
-      border: `1px solid ${filterMem === m ? C.blue : C.sep}`,
-      background: filterMem === m ? `${C.blue}12` : "transparent",
-      color: filterMem === m ? C.blue : C.text2,
-      whiteSpace: "nowrap",
-      cursor: "pointer",
-      flexShrink: 0
-    }
-  }, m === "ALL" ? "全員" : m.split(" ")[0]))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -3622,7 +3619,7 @@ function App() {
       key: resetKey,
       mode: mode,
       members: members,
-      membersLoading: membersLoading,
+      membersLoading: false,
       member: member,
       setMember: setMember,
       interviewee: interviewee,
@@ -3636,7 +3633,8 @@ function App() {
       })
     }) : /*#__PURE__*/React.createElement(HistoryScreen, {
       members: members,
-      newRecord: newRecord
+      newRecord: newRecord,
+      memberFilter: currentUser?.name || ''
     })))
   );
 }
