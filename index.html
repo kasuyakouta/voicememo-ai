@@ -704,9 +704,17 @@ function GoogleLoginButton({
           callback: res => {
             if (res.credential) {
               const payload = parseJwt(res.credential);
+              const email = payload.email || "";
+              // ドメイン制限：@kk-saikoh.co.jp のみ許可
+              if (!email.endsWith("@kk-saikoh.co.jp")) {
+                alert("社内アカウント（@kk-saikoh.co.jp）でログインしてください。\n現在のアカウント：" + email);
+                window.google.accounts.id.disableAutoSelect();
+                setLoading(false);
+                return;
+              }
               const userInfo = {
                 name: payload.name || "",
-                email: payload.email || "",
+                email: email,
                 picture: payload.picture || ""
               };
               sessionStorage.setItem(AUTH_KEY, "1");
