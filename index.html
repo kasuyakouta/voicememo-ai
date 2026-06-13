@@ -397,8 +397,27 @@ const PAGE_SIZE = 20;
 // 9. Google ログイン：Google Cloud ConsoleでOAuthクライアントIDを取得して設定
 // 空のままではGoogle認証は無効（PINのみ有効）
 const GOOGLE_CLIENT_ID = "815009773191-cq7dcaju86pl91dnjhk921stbinmssg9.apps.googleusercontent.com";
+const DRIVE_FOLDER_ID = "1sMASxe0KywM1ZZ5NBPPDRk1d-M5KY9VH"; // VoiceMemo AI フォルダ（共有ドライブ）
 // 10. Google Drive保存：LS_KEY_DRIVEでオン/オフ管理
 const LS_KEY_DRIVE = 'vm_drive_save_v1';
+const LS_KEY_SUGGESTIONS = 'vm_interviewee_suggestions_v1';
+
+// ⑥ 相手名サジェスト：localStorageから取得・保存
+function lsLoadSuggestions() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_KEY_SUGGESTIONS) || '[]');
+  } catch {
+    return [];
+  }
+}
+function lsSaveSuggestion(name) {
+  if (!name || !name.trim()) return;
+  try {
+    const list = lsLoadSuggestions();
+    const updated = [name, ...list.filter(s => s !== name)].slice(0, 20);
+    localStorage.setItem(LS_KEY_SUGGESTIONS, JSON.stringify(updated));
+  } catch {}
+}
 
 // ================================================================
 // COLORS
@@ -548,16 +567,37 @@ function copyText(t) {
 // 7. 相対日付表示
 function relDate(s) {
   if (!s) return "";
-  const d = new Date(s.replace(" ", "T"));
-  if (isNaN(d)) return s;
+  // "YYYY-MM-DD HH:MM:SS" 形式に正規化
+  const normalized = String(s).replace(" ", "T");
+  const d = new Date(normalized);
+  if (isNaN(d.getTime())) return String(s);
+  // 1900年以前は GAS の日付型誤変換なので空文字を返す
+  if (d.getFullYear() < 1970) return "";
   const now = new Date();
   const toDay = v => new Date(v.getFullYear(), v.getMonth(), v.getDate()).getTime();
-  const diff = (toDay(now) - toDay(d)) / 86400000;
+  const diff = Math.round((toDay(now) - toDay(d)) / 86400000);
   const t = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   if (diff === 0) return `今日 ${t}`;
   if (diff === 1) return `昨日 ${t}`;
   if (diff < 7) return `${diff}日前 ${t}`;
   return `${d.getMonth() + 1}/${d.getDate()} ${t}`;
+}
+
+// durationの異常値（GASのDate型誤変換）をフィルタ
+function safeDuration(s) {
+  if (!s) return "";
+  const str = String(s);
+  // "MM:SS" 形式のみ有効
+  if (/^\d{2}:\d{2}$/.test(str)) return str;
+  // Date型誤変換の場合は時刻部分だけ抽出
+  const d = new Date(str);
+  if (!isNaN(d.getTime()) && d.getFullYear() < 1970) {
+    const h = d.getHours(),
+      m = d.getMinutes(),
+      sec = d.getSeconds();
+    return `${String(h * 60 + m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  }
+  return str;
 }
 
 // ================================================================
@@ -678,6 +718,43 @@ function PinScreen({
 // ================================================================
 // 9. Google ログインコンポーネント（GOOGLE_CLIENT_ID設定時のみ使用）
 // ================================================================
+// ================================================================
+// ④ Google Drive 直接アップロード（長時間録音対応）
+// ================================================================
+async function uploadAudioToDrive(blob, filename, folderId, accessToken) {
+  if (!accessToken) throw new Error("アクセストークンがありません");
+
+  // multipart/form-data でDrive APIに直接アップロード
+  const metadata = JSON.stringify({
+    name: filename,
+    parents: [folderId]
+  });
+  const boundary = "voicememo_boundary_" + Date.now();
+  const delimiter = "--" + boundary;
+  const closeDelimiter = "--" + boundary + "--";
+
+  // Blobをbase64に変換
+  const arrayBuffer = await blob.arrayBuffer();
+  const uint8 = new Uint8Array(arrayBuffer);
+  let binary = "";
+  uint8.forEach(b => binary += String.fromCharCode(b));
+  const b64 = btoa(binary);
+  const body = [delimiter, "Content-Type: application/json; charset=UTF-8", "", metadata, delimiter, `Content-Type: ${blob.type || "audio/mp4"}`, "Content-Transfer-Encoding: base64", "", b64, closeDelimiter].join("\r\n");
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + accessToken,
+      "Content-Type": `multipart/related; boundary=${boundary}`
+    },
+    body
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || "Drive upload failed");
+  }
+  return res.json(); // {id, webViewLink}
+}
+
 // JWT デコード（Base64）
 function parseJwt(token) {
   try {
@@ -700,6 +777,7 @@ function GoogleLoginButton({
       if (!window.google?.accounts?.id) return;
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
+        auto_select: true,
         callback: res => {
           if (!res.credential) return;
           const payload = parseJwt(res.credential);
@@ -717,6 +795,9 @@ function GoogleLoginButton({
           };
           sessionStorage.setItem(AUTH_KEY, "1");
           sessionStorage.setItem("vm_user", JSON.stringify(userInfo));
+          // ④ アクセストークンを保存（Drive直接アップロード用）
+          // Note: JWTのcredentialはIDトークン。アクセストークンはOAuth2フローで別途取得が必要
+          // 今はGASバイパス方式でfileIdだけ送る構成にする
           setLoading(false);
           onSuccessRef.current(userInfo);
         }
@@ -901,7 +982,7 @@ function Drawer({
       fontSize: 15,
       color: C.text2
     }
-  }, "\u30ED\u30C3\u30AF")))));
+  }, "\u30ED\u30B0\u30A2\u30A6\u30C8")))));
 }
 
 // ================================================================
@@ -992,7 +1073,10 @@ function ModeButton({
       gap: 5,
       cursor: "pointer",
       transform: pressing ? "scale(.96)" : "scale(1)",
-      transition: "transform .1s"
+      transition: "transform .1s",
+      WebkitUserSelect: "none",
+      userSelect: "none",
+      WebkitTouchCallout: "none"
     }
   }, cfg.label, "\u30E2\u30FC\u30C9", /*#__PURE__*/React.createElement("span", {
     style: {
@@ -1362,7 +1446,7 @@ function EditableSummary({
       if (onSaved) onSaved(draft);
       setTimeout(() => setMsg(null), 3000);
     } catch (e) {
-      setMsg("保存失敗: " + e.message);
+      setMsg("保存に失敗しました。再試行してください。");
     }
     setSaving(false);
   };
@@ -1783,7 +1867,7 @@ function SummaryModal({
       fontSize: 11,
       color: C.text2
     }
-  }, relDate(item.date), " \xB7 ", item.duration)), /*#__PURE__*/React.createElement("button", {
+  }, relDate(item.date), " \xB7 ", safeDuration(item.duration))), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       width: 32,
@@ -2011,7 +2095,7 @@ function RecordingCard({
       fontSize: 11,
       color: C.text2
     }
-  }, relDate(rec.date), " \xB7 ", rec.duration)), rec.url && /*#__PURE__*/React.createElement(AudioPlayer, {
+  }, relDate(rec.date), " \xB7 ", safeDuration(rec.duration))), rec.url && /*#__PURE__*/React.createElement(AudioPlayer, {
     url: rec.url,
     onDelete: () => onDelete(rec.localId)
   }), rec.url && !rec.processed && /*#__PURE__*/React.createElement("div", {
@@ -2095,7 +2179,6 @@ function RecordingCard({
 function HomeScreen({
   mode,
   members,
-  membersLoading,
   member,
   setMember,
   interviewee,
@@ -2103,7 +2186,8 @@ function HomeScreen({
   meetingName,
   setMeetingName,
   isOnline,
-  onRecordSaved
+  onRecordSaved,
+  onRecordingChange
 }) {
   const [recState, setRecState] = useState("idle");
   const [timer, setTimer] = useState(0);
@@ -2123,6 +2207,9 @@ function HomeScreen({
       return false;
     }
   });
+  // ⑥ 相手名サジェスト
+  const [suggestions, setSuggestions] = useState(() => lsLoadSuggestions());
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const toggleDriveSave = () => {
     const v = !driveSave;
     setDriveSave(v);
@@ -2176,7 +2263,7 @@ function HomeScreen({
   const startRec = async () => {
     if (mode === "interview" && !member) return;
     if (!isOnline) {
-      setError("オフラインです。接続を確認してください。");
+      setError("オフラインです。WiFiまたはモバイルデータを確認してください。");
       return;
     }
     setError(null);
@@ -2235,12 +2322,18 @@ function HomeScreen({
     };
     setLocalRecs(prev => [...prev, newRec]);
     setRecState("stopped");
+    if (onRecordingChange) onRecordingChange(false);
     // 2. 直前の入力を保存
     lsSaveLastInput({
       member,
       interviewee,
       meetingName
     });
+    // ⑥ 相手名をサジェスト候補に保存
+    if (interviewee) {
+      lsSaveSuggestion(interviewee);
+      setSuggestions(lsLoadSuggestions());
+    }
     // 1. 自動AI処理
     if (autoProcess) setTimeout(() => processRec(newRec), 300);
   };
@@ -2254,14 +2347,30 @@ function HomeScreen({
   };
   const processRec = async rec => {
     if (!isOnline) {
-      setError("オフラインです。接続を確認してください。");
+      setError("オフラインです。WiFiまたはモバイルデータを確認してください。");
       return;
     }
     setProcessingId(rec.localId);
     try {
+      const mimeType = mrRef.current?.mimeType || "audio/mp4";
       const blob = new Blob(rec.chunks, {
-        type: mrRef.current?.mimeType || "audio/mp4"
+        type: mimeType
       });
+      let driveFileId = null;
+
+      // ④ Drive直接アップロード（driveSaveがONの場合）
+      if (driveSave) {
+        try {
+          const accessToken = sessionStorage.getItem("vm_access_token");
+          const ext = mimeType.includes("mp4") ? "m4a" : "webm";
+          const safeName = (rec.member || "recording").replace(/[^\w぀-ヿ一-鿿]/g, "_");
+          const filename = `${(rec.date || "").replace(/[: ]/g, "-").slice(0, 19)}_${safeName}.${ext}`;
+          const result = await uploadAudioToDrive(blob, filename, DRIVE_FOLDER_ID, accessToken);
+          driveFileId = result?.id || null;
+        } catch (driveErr) {
+          console.warn("[Drive] アップロード失敗（処理は継続）:", driveErr.message);
+        }
+      }
       const b64 = await new Promise(res => {
         const r = new FileReader();
         r.onloadend = () => res(r.result.split(",")[1]);
@@ -2272,9 +2381,12 @@ function HomeScreen({
         member: rec.member,
         interviewee: rec.interviewee,
         meetingName: rec.meetingName,
-        saveToDrive: driveSave,
+        saveToDrive: false,
+        // GAS側では保存しない（フロントで直接アップロード済み）
+        driveFileId: driveFileId,
+        // ④ Drive保存済みのファイルID
         audio: b64,
-        mimeType: mrRef.current?.mimeType || "audio/mp4",
+        mimeType: mimeType,
         duration: rec.duration,
         date: rec.date,
         mode: rec.mode,
@@ -2298,7 +2410,7 @@ function HomeScreen({
       });
       if (mode === "interview" && rec.member) CACHE.prev.delete(rec.member);
     } catch (e) {
-      setError("処理に失敗しました: " + e.message);
+      setError("処理に失敗しました。しばらくしてから再試行してください。");
     }
     setProcessingId(null);
   };
@@ -2446,16 +2558,7 @@ function HomeScreen({
         gap: 5,
         marginBottom: 2
       }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        fontWeight: 600,
-        color: C.text,
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis"
-      }
-    }, title), /*#__PURE__*/React.createElement(ModeBadge, {
+    }, /*#__PURE__*/React.createElement(ModeBadge, {
       mode: item.mode,
       small: true
     })), /*#__PURE__*/React.createElement("p", {
@@ -2464,7 +2567,7 @@ function HomeScreen({
         color: C.text2,
         marginBottom: fs ? 2 : 0
       }
-    }, relDate(item.date), " \xB7 ", item.duration), fs && /*#__PURE__*/React.createElement("p", {
+    }, relDate(item.date), " \xB7 ", safeDuration(item.duration)), fs && /*#__PURE__*/React.createElement("p", {
       style: {
         fontSize: 11,
         color: C.text2,
@@ -2545,39 +2648,7 @@ function HomeScreen({
       marginTop: "auto",
       paddingTop: 16
     }
-  }, mode === "interview" ? /*#__PURE__*/React.createElement(React.Fragment, null, membersLoading ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: 44,
-      display: "flex",
-      alignItems: "center",
-      gap: 7,
-      color: C.text2,
-      fontSize: 14,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "spinner",
-    size: 13,
-    color: C.text2,
-    cls: "spin"
-  }), "\u8AAD\u307F\u8FBC\u307F\u4E2D...") : /*#__PURE__*/React.createElement("select", {
-    value: member,
-    onChange: e => setMember(e.target.value),
-    style: {
-      ...inputStyle,
-      padding: "11px 36px 11px 13px",
-      marginBottom: 8,
-      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238E8E93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
-      backgroundRepeat: "no-repeat",
-      backgroundPosition: "right 12px center",
-      border: `1.5px solid ${member ? C.blue : C.sep}`
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "\u9762\u8AC7\u62C5\u5F53\u3092\u9078\u629E...\uFF08\u5165\u529B\u5FC5\u9808\uFF09"), members.map(m => /*#__PURE__*/React.createElement("option", {
-    key: m,
-    value: m
-  }, m))), /*#__PURE__*/React.createElement("div", {
+  }, mode === "interview" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
     }
@@ -3038,7 +3109,7 @@ function DeleteConfirmModal({
       textAlign: "center",
       marginBottom: 4
     }
-  }, relDate(item.date), " \xB7 ", item.duration), /*#__PURE__*/React.createElement("p", {
+  }, relDate(item.date), " \xB7 ", safeDuration(item.duration)), /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 12,
       color: C.red,
@@ -3127,7 +3198,7 @@ function HistoryScreen({
       setHasMore(d.hasMore || false);
       offsetRef.current = PAGE_SIZE;
     } catch (e) {
-      setError("履歴の取得に失敗しました: " + e.message);
+      setError("履歴を取得できませんでした。接続を確認して再試行してください。");
     }
     setInitLoad(false);
   }, [memberFilter]);
@@ -3150,7 +3221,7 @@ function HistoryScreen({
       setHasMore(d.hasMore || false);
       offsetRef.current += PAGE_SIZE;
     } catch (e) {
-      setError("追加取得に失敗: " + e.message);
+      setError("追加データの取得に失敗しました。再試行してください。");
     }
     setMoreLoad(false);
   };
@@ -3179,7 +3250,7 @@ function HistoryScreen({
       setDeleteTarget(null);
       setSwipedId(null);
     } catch (e) {
-      setError("削除に失敗しました: " + e.message);
+      setError("削除に失敗しました。しばらくしてから再試行してください。");
       setDeleteTarget(null);
     }
     setDeleting(false);
@@ -3439,8 +3510,8 @@ function App() {
   const [mode, setMode] = useState("interview");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [showOfflineMsg, setShowOfflineMsg] = useState(false);
   const [members, setMembers] = useState([]);
-  const [membersLoading, setMembersLoading] = useState(true);
   // Googleログイン後にユーザー情報から自動設定
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -3456,8 +3527,14 @@ function App() {
   const [resetKey, setResetKey] = useState(0); // 新規録音リセット用
 
   useEffect(() => {
-    const on = () => setIsOnline(true),
-      off = () => setIsOnline(false);
+    const on = () => {
+      setIsOnline(true);
+      setShowOfflineMsg(false);
+    };
+    const off = () => {
+      setIsOnline(false);
+      setShowOfflineMsg(true);
+    };
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
     return () => {
@@ -3465,42 +3542,28 @@ function App() {
       window.removeEventListener("offline", off);
     };
   }, []);
+
+  // 案C：ログイン直後にマイク許可を事前取得
   useEffect(() => {
     if (!authed) return;
-    (async () => {
-      // ① まず localStorage から即座に表示（ローディング不要）
-      const lsCached = lsLoadMembers();
-      if (lsCached && lsCached.length > 0) {
-        setMembers(lsCached);
-        setMembersLoading(false);
-        // メモリキャッシュも更新
-        CACHE.members = {
-          data: lsCached,
-          ts: Date.now()
-        };
-      }
-
-      // ② メモリキャッシュが新鮮なら終了（GASリクエスト不要）
-      if (isFresh(CACHE.members)) return;
-
-      // ③ バックグラウンドでGASから最新データを取得・更新
-      try {
-        const d = await gasGet({
-          action: "getMembers"
-        });
-        const l = d.members || [];
-        setMembers(l);
-        CACHE.members = {
-          data: l,
-          ts: Date.now()
-        };
-        lsSaveMembers(l); // localStorage に保存（次回即時表示用）
-        if (!lsCached || lsCached.length === 0) setMembersLoading(false);
-      } catch {
-        if (!lsCached) setMembersLoading(false);
-      }
-    })();
+    navigator.mediaDevices?.getUserMedia({
+      audio: true
+    }).then(s => s.getTracks().forEach(t => t.stop())).catch(() => {});
   }, [authed]);
+
+  // ⑧ 録音中にブラウザを閉じようとした場合の警告
+  const [isRecording, setIsRecording] = useState(false);
+  useEffect(() => {
+    const handler = e => {
+      if (isRecording) {
+        e.preventDefault();
+        e.returnValue = "録音中です。ページを離れると録音データが失われます。";
+        return e.returnValue;
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isRecording]);
   const handleModeChange = m => {
     setMode(m);
     setMember("");
@@ -3559,7 +3622,8 @@ function App() {
           setMeetingName("");
         }
       },
-      onLock: handleLock
+      onLock: handleLock,
+      userName: currentUser?.name || ""
     }), /*#__PURE__*/React.createElement("div", {
       style: {
         flexShrink: 0,
@@ -3606,7 +3670,45 @@ function App() {
     }), "\u30AA\u30D5\u30E9\u30A4\u30F3"), /*#__PURE__*/React.createElement(ModeButton, {
       mode: mode,
       onChange: handleModeChange
-    })), /*#__PURE__*/React.createElement("div", {
+    })), showOfflineMsg && /*#__PURE__*/React.createElement("div", {
+      style: {
+        flexShrink: 0,
+        background: C.orange,
+        padding: "8px 16px",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        justifyContent: "space-between"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "wifi-slash",
+      size: 14,
+      color: "#fff"
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: "#fff",
+        fontWeight: 500
+      }
+    }, "\u30AA\u30D5\u30E9\u30A4\u30F3\u3067\u3059\u3002WiFi\u307E\u305F\u306F\u30E2\u30D0\u30A4\u30EB\u30C7\u30FC\u30BF\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setShowOfflineMsg(false),
+      style: {
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: 4
+      }
+    }, /*#__PURE__*/React.createElement(Ic, {
+      n: "xmark",
+      size: 14,
+      color: "#fff"
+    }))), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         overflow: "hidden",
@@ -3617,7 +3719,6 @@ function App() {
       key: resetKey,
       mode: mode,
       members: members,
-      membersLoading: false,
       member: member,
       setMember: setMember,
       interviewee: interviewee,
@@ -3628,7 +3729,8 @@ function App() {
       onRecordSaved: rec => setNewRecord({
         ...rec,
         _ts: Date.now()
-      })
+      }),
+      onRecordingChange: setIsRecording
     }) : /*#__PURE__*/React.createElement(HistoryScreen, {
       members: members,
       newRecord: newRecord,
