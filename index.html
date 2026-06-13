@@ -2523,7 +2523,7 @@ function HomeScreen({
       lineHeight: 1.7,
       textAlign: "center"
     }
-  }, mode === "meeting" ? meetingName || "会議モードで録音を開始します" : member ? "録音を開始してください" : "まずメンバーを選択してください")), recentRecs.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, mode === "meeting" ? meetingName || "会議モードで録音を開始します" : "録音を開始してください")), recentRecs.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8
     }
@@ -3626,7 +3626,7 @@ function App() {
         setScreen(k === "home" ? "home" : "history");
         if (k === "home") {
           setResetKey(n => n + 1);
-          setMember("");
+          setMember(currentUser?.name || ""); // Googleログイン名を維持
           setInterviewee("");
           setMeetingName("");
         }
