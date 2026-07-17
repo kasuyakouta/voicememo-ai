@@ -573,11 +573,15 @@ function copyText(t) {
 // 7. 相対日付表示
 function relDate(s) {
   if (!s) return "";
-  // "YYYY-MM-DD HH:MM:SS" 形式に正規化
-  const normalized = String(s).replace(" ", "T");
-  const d = new Date(normalized);
-  if (isNaN(d.getTime())) return String(s);
-  // 1900年以前は GAS の日付型誤変換なので空文字を返す
+  const str = String(s);
+  // まず直接パース（"Mon Jun 15 2026..." 等の形式に対応）
+  let d = new Date(str);
+  // 直接パースが失敗した場合は "YYYY-MM-DD HH:MM:SS" → ISO形式に変換
+  if (isNaN(d.getTime())) {
+    d = new Date(str.replace(" ", "T"));
+  }
+  if (isNaN(d.getTime())) return str;
+  // 1900年以前は GAS の日付型誤変換
   if (d.getFullYear() < 1970) return "";
   const now = new Date();
   const toDay = v => new Date(v.getFullYear(), v.getMonth(), v.getDate()).getTime();
