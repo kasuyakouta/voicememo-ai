@@ -769,7 +769,13 @@ async function uploadAudioToDrive(blob, filename, folderId, accessToken) {
 function parseJwt(token) {
   try {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(base64));
+    // UTF-8 文字（日本語等）を正しくデコード
+    const jsonStr = decodeURIComponent(
+      atob(base64).split('').map(c =>
+        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+      ).join('')
+    );
+    return JSON.parse(jsonStr);
   } catch {
     return {};
   }
