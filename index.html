@@ -493,7 +493,13 @@ const LS_KEY_LAST = 'vm_last_input_v1';
 const LS_KEY_AUTO = 'vm_auto_process_v1';
 function lsLoadLastInput() {
   try {
-    return JSON.parse(localStorage.getItem(LS_KEY_LAST) || '{}');
+    const d = JSON.parse(localStorage.getItem(LS_KEY_LAST) || '{}');
+    // member名の文字化けも修復
+    if (d.member && /[\xc0-\xff][\x80-\xbf]/.test(d.member)) {
+      d.member = fixGarbledUtf8(d.member);
+      localStorage.setItem(LS_KEY_LAST, JSON.stringify(d));
+    }
+    return d;
   } catch {
     return {};
   }
@@ -2447,6 +2453,8 @@ function HomeScreen({
         mode: rec.mode,
         sections: data.sections
       });
+      // デバッグ：処理成功の確認（後で削除予定）
+      console.log("[processRec] 成功 id:", data.id, "sections:", JSON.stringify(data.sections).slice(0,100));
       if (mode === "interview" && rec.member) CACHE.prev.delete(rec.member);
     } catch (e) {
       setError("処理に失敗しました: " + (e.message || "不明なエラー"));
