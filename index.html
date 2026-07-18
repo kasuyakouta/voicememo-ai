@@ -2437,6 +2437,7 @@ function HomeScreen({
         mode: rec.mode,
         systemPrompt: PROMPTS[rec.mode].systemPrompt
       });
+      if (!data.sections) throw new Error("AI処理結果が取得できませんでした。GASのログを確認してください。id=" + data.id);
       setLocalRecs(prev => prev.map(r => r.localId === rec.localId ? {
         ...r,
         processed: true,
@@ -2453,8 +2454,7 @@ function HomeScreen({
         mode: rec.mode,
         sections: data.sections
       });
-      // デバッグ：処理成功の確認（後で削除予定）
-      console.log("[processRec] 成功 id:", data.id, "sections:", JSON.stringify(data.sections).slice(0,100));
+
       if (mode === "interview" && rec.member) CACHE.prev.delete(rec.member);
     } catch (e) {
       setError("処理に失敗しました: " + (e.message || "不明なエラー"));
