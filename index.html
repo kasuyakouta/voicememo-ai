@@ -826,8 +826,8 @@ function GoogleLoginButton({
         email,
         picture: payload.picture || ""
       };
-      sessionStorage.setItem(AUTH_KEY, "1");
-      sessionStorage.setItem("vm_user", JSON.stringify(userInfo));
+      localStorage.setItem(AUTH_KEY, JSON.stringify({value:"1", expires: Date.now() + 7*24*60*60*1000}));
+      localStorage.setItem("vm_user", JSON.stringify(userInfo));
       setLoading(false);
       onSuccessRef.current(userInfo);
     };
@@ -861,17 +861,29 @@ function GoogleLoginButton({
     };
   }, []);
 
+  const resetLogin = () => {
+    setLoading(false);
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.disableAutoSelect();
+      setTimeout(() => window.google.accounts.id.prompt(), 500);
+    }
+  };
+
   const handleClick = () => {
     if (!window.google?.accounts?.id) {
       alert("Google\u306e\u30ed\u30b0\u30a4\u30f3\u3092\u8aad\u307f\u8fbc\u307f\u4e2d\u3067\u3059\u3002\u5c11\u3057\u5f85\u3063\u3066\u304b\u3089\u518d\u5ea6\u30bf\u30c3\u30d7\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
       return;
     }
     setLoading(true);
+    // 15秒でタイムアウト（止まった場合の保険）
+    setTimeout(() => setLoading(prev => prev ? false : prev), 15000);
     window.google.accounts.id.prompt();
   };
 
+
   if (!GOOGLE_CLIENT_ID) return null;
-  return /*#__PURE__*/React.createElement("button", {
+  return /*#__PURE__*/React.createElement("div", {style:{display:"flex",flexDirection:"column",alignItems:"center",gap:8}},
+  /*#__PURE__*/React.createElement("button", {
     onClick: handleClick,
     disabled: loading,
     style: {
@@ -907,7 +919,11 @@ function GoogleLoginButton({
   }), /*#__PURE__*/React.createElement("path", {
     fill: "#EA4335",
     d: "M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.3z"
-  })), loading ? "\u30ed\u30b0\u30a4\u30f3\u4e2d..." : "Google\u3067\u30ed\u30b0\u30a4\u30f3");
+  })), loading ? "\u30ed\u30b0\u30a4\u30f3\u4e2d..." : "Google\u3067\u30ed\u30b0\u30a4\u30f3"),
+  /*#__PURE__*/React.createElement("button", {
+    onClick: resetLogin,
+    style:{fontSize:12,color:"#888",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}
+  }, "\u5225\u306e\u30a2\u30ab\u30a6\u30f3\u30c8\u3067\u30ed\u30b0\u30a4\u30f3 / \u30ea\u30bb\u30c3\u30c8"));
 }
 
 function Drawer({
@@ -3541,8 +3557,18 @@ function HistoryScreen({
 // ================================================================
 function App() {
   const [authed, setAuthed] = useState(() => {
-    // vm_user が壊れてクリアされた場合は未認証扱い
-    return sessionStorage.getItem(AUTH_KEY) === "1" && !!sessionStorage.getItem("vm_user");
+    try {
+      const raw = localStorage.getItem(AUTH_KEY);
+      if (!raw) return false;
+      const { value, expires } = JSON.parse(raw);
+      // 有効期限チェック（7日）
+      if (Date.now() > expires) {
+        localStorage.removeItem(AUTH_KEY);
+        localStorage.removeItem("vm_user");
+        return false;
+      }
+      return value === "1" && !!localStorage.getItem("vm_user");
+    } catch { return false; }
   });
   const [screen, setScreen] = useState("home");
   const [mode, setMode] = useState("interview");
@@ -3553,14 +3579,14 @@ function App() {
   // Googleログイン後にユーザー情報から自動設定
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = JSON.parse(sessionStorage.getItem("vm_user") || "{}");
+      const saved = JSON.parse(localStorage.getItem("vm_user") || "{}");
       if (!saved.name) return saved;
       // 文字化けチェック：Latin-1バイト列パターンが連続していれば修復
       const hasMojibake = /[\xc0-\xff][\x80-\xbf]/.test(saved.name);
       if (hasMojibake) {
         // TextDecoder で UTF-8 として正しく読み直す
         const fixed = { ...saved, name: fixGarbledUtf8(saved.name) };
-        sessionStorage.setItem("vm_user", JSON.stringify(fixed));
+        localStorage.setItem("vm_user", JSON.stringify(fixed));
         return fixed;
       }
       return saved;
@@ -3614,13 +3640,14 @@ function App() {
   }, [isRecording]);
   const handleModeChange = m => {
     setMode(m);
-    setMember("");
+    // 面談モードに戻る時はGoogleログイン名を維持
+    setMember(m === "interview" ? (currentUser?.name || "") : "");
     setInterviewee("");
     setMeetingName("");
   };
   const handleLock = () => {
-    sessionStorage.removeItem(AUTH_KEY);
-    sessionStorage.removeItem("vm_user");
+    localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem("vm_user");
     setAuthed(false);
     setCurrentUser({});
     setMember("");
