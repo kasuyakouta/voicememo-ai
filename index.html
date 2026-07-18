@@ -25,8 +25,32 @@
   <meta property="og:site_name" content="VoiceMemo AI" />
 
   <!-- Google Sign-In -->
-  <script src="https://accounts.google.com/gsi/client" async defer onload="typeof window.__gsiCallback==='function'&&window.__gsiCallback()"></script>
+  <!-- Google Sign-In: HTML属性ベース（モバイル対応） -->
+  <meta name="google-signin-client_id" content="815009773191-cq7dcaju86pl91dnjhk921stbinmssg9.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
+  <script>
+    // Google Sign-In コールバック（グローバル関数として定義）
+    function handleGoogleSignIn(response) {
+      if (!response.credential) return;
+      // JWTをUTF-8デコード
+      try {
+        const base64 = response.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+        const jsonStr = decodeURIComponent(atob(base64).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+        const payload = JSON.parse(jsonStr);
+        const email = payload.email || '';
+        if (!email.endsWith('@kk-saikoh.co.jp')) {
+          alert('社内アカウント（@kk-saikoh.co.jp）でログインしてください。\n現在のアカウント：' + email);
+          return;
+        }
+        const userInfo = { name: payload.name || '', email, picture: payload.picture || '' };
+        localStorage.setItem('vm_auth_v1', JSON.stringify({value:'1', expires: Date.now()+7*24*60*60*1000}));
+        localStorage.setItem('vm_user', JSON.stringify(userInfo));
+        // Reactの状態を更新（カスタムイベント経由）
+        window.dispatchEvent(new CustomEvent('googleSignInSuccess', { detail: userInfo }));
+      } catch(e) { alert('ログインエラー: ' + e.message); }
+    }
+  </script>
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;-webkit-user-select:none;user-select:none}
     body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;color:#1C1C1E}
@@ -803,95 +827,43 @@ function parseJwt(token) {
 function GoogleLoginButton({
   onSuccess
 }) {
-  const containerRef = useRef(null);
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
-  const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
-
-    const handleCredential = res => {
-      if (!res.credential) return;
-      const payload = parseJwt(res.credential);
-      const email = payload.email || "";
-      if (!email.endsWith("@kk-saikoh.co.jp")) {
-        alert("\u793e\u5185\u30a2\u30ab\u30a6\u30f3\u30c8\uff08@kk-saikoh.co.jp\uff09\u3067\u30ed\u30b0\u30a4\u30f3\u3057\u3066\u304f\u3060\u3055\u3044\u3002\n\u73fe\u5728\u306e\u30a2\u30ab\u30a6\u30f3\u30c8\uff1a" + email);
-        window.google?.accounts?.id?.disableAutoSelect();
-        return;
-      }
-      const userInfo = { name: payload.name || "", email, picture: payload.picture || "" };
-      localStorage.setItem(AUTH_KEY, JSON.stringify({value:"1", expires: Date.now() + 7*24*60*60*1000}));
-      localStorage.setItem("vm_user", JSON.stringify(userInfo));
-      onSuccessRef.current(userInfo);
+    // カスタムイベントでReact状態を更新
+    const handler = e => {
+      onSuccessRef.current(e.detail);
     };
-
-    const doInit = () => {
-      if (initializedRef.current) return;
-      if (!window.google?.accounts?.id) return;
-      initializedRef.current = true;
-
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        auto_select: true,
-        callback: handleCredential
-      });
-
-      // 公式ボタンをレンダリング（モバイル対応・最も確実な方法）
-      if (containerRef.current) {
-        window.google.accounts.id.renderButton(containerRef.current, {
-          theme: "outline",
-          size: "large",
-          width: 280,
-          locale: "ja"
-        });
-      }
-
-      // One Tap も表示
-      window.google.accounts.id.prompt();
-    };
-
-    window.__gsiCallback = () => setTimeout(doInit, 100);
-    let retries = 0;
-    const poll = setInterval(() => {
-      if (window.google?.accounts?.id) { clearInterval(poll); doInit(); }
-      else if (++retries >= 20) clearInterval(poll);
-    }, 500);
-
-    return () => { clearInterval(poll); window.__gsiCallback = null; };
+    window.addEventListener('googleSignInSuccess', handler);
+    return () => window.removeEventListener('googleSignInSuccess', handler);
   }, []);
-
-  const handleReset = () => {
-    initializedRef.current = false;
-    if (window.google?.accounts?.id) {
-      window.google.accounts.id.disableAutoSelect();
-      // 公式ボタンを再レンダリング
-      setTimeout(() => {
-        if (containerRef.current && window.google?.accounts?.id) {
-          window.google.accounts.id.renderButton(containerRef.current, {
-            theme: "outline", size: "large", width: 280, locale: "ja"
-          });
-          window.google.accounts.id.prompt();
-        }
-      }, 300);
-    }
-  };
 
   if (!GOOGLE_CLIENT_ID) return null;
 
   return /*#__PURE__*/React.createElement("div", {
     style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 8 }
   },
-    // Google公式ボタン（renderButtonが描画するコンテナ）
+    // Google公式ボタン（HTML属性ベース・最も確実）
     /*#__PURE__*/React.createElement("div", {
-      ref: containerRef,
-      style: { minHeight: 44, minWidth: 280 }
+      id: "g_id_onload",
+      "data-client_id": GOOGLE_CLIENT_ID,
+      "data-context": "signin",
+      "data-ux_mode": "popup",
+      "data-callback": "handleGoogleSignIn",
+      "data-auto_prompt": "true",
+      "data-itp_support": "true"
     }),
-    // リセットリンク
-    /*#__PURE__*/React.createElement("button", {
-      onClick: handleReset,
-      style: { fontSize: 12, color: "#888", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: "4px 8px" }
-    }, "\u5225\u306e\u30a2\u30ab\u30a6\u30f3\u30c8\u3067\u30ed\u30b0\u30a4\u30f3 / \u30ea\u30bb\u30c3\u30c8")
+    /*#__PURE__*/React.createElement("div", {
+      className: "g_id_signin",
+      "data-type": "standard",
+      "data-shape": "rectangular",
+      "data-theme": "outline",
+      "data-text": "signin_with",
+      "data-size": "large",
+      "data-locale": "ja",
+      "data-width": "280"
+    })
   );
 }
 >
