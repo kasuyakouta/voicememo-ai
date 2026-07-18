@@ -696,87 +696,140 @@ function ModeBadge({
 // PIN SCREEN
 // ================================================================
 const PIN_LABELS = ["", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"];
-function PinScreen({onSuccess}) {
-  const [name, setName] = React.useState("");
-  const [error, setError] = React.useState("");
-
-  const handleStart = () => {
-    const trimmed = name.trim();
-    if (!trimmed) { setError("\u540d\u524d\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044"); return; }
-    const userInfo = { name: trimmed, email: "", picture: "" };
-    localStorage.setItem(AUTH_KEY, JSON.stringify({value:"1", expires: Date.now()+30*24*60*60*1000}));
+function PinScreen({
+  onSuccess
+}) {
+  const [name, setName] = useState("");
+  const [err, setErr] = useState("");
+  const doStart = () => {
+    const n = name.trim();
+    if (!n) {
+      setErr("名前を入力してください");
+      return;
+    }
+    const userInfo = {
+      name: n,
+      email: "",
+      picture: ""
+    };
+    localStorage.setItem(AUTH_KEY, JSON.stringify({
+      value: "1",
+      expires: Date.now() + 30 * 24 * 60 * 60 * 1000
+    }));
     localStorage.setItem("vm_user", JSON.stringify(userInfo));
     onSuccess(userInfo);
   };
-
-  const handleKey = e => { if (e.key === "Enter") handleStart(); };
-
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      position:"absolute", inset:0, background:"#F2F2F7",
-      display:"flex", flexDirection:"column", alignItems:"center",
-      justifyContent:"center", padding:32, zIndex:999
+      position: "absolute",
+      inset: 0,
+      background: "#F2F2F7",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 32,
+      zIndex: 999
     }
-  },
-    // ロゴ
-    /*#__PURE__*/React.createElement("div", {
-      style: {width:72,height:72,borderRadius:20,background:"rgba(0,122,255,.12)",
-        display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}
-    }, /*#__PURE__*/React.createElement(Ic, {n:"microphone",size:32,color:"#007AFF"})),
-
-    /*#__PURE__*/React.createElement("p", {
-      style:{fontSize:24,fontWeight:700,color:"#1C1C1E",marginBottom:8}
-    }, "VoiceMemo AI"),
-
-    /*#__PURE__*/React.createElement("p", {
-      style:{fontSize:15,color:"#8E8E93",marginBottom:40,textAlign:"center",lineHeight:1.6}
-    }, "\u304a\u540d\u524d\u3092\u5165\u529b\u3057\u3066\u958b\u59cb\u3057\u3066\u304f\u3060\u3055\u3044"),
-
-    // 名前入力欄
-    /*#__PURE__*/React.createElement("div", {
-      style:{width:"100%",maxWidth:280,marginBottom:12,position:"relative"}
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 72,
+      height: 72,
+      borderRadius: 20,
+      background: "rgba(0,122,255,.12)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "microphone",
+    size: 32,
+    color: "#007AFF"
+  })), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 24,
+      fontWeight: 700,
+      color: "#1C1C1E",
+      marginBottom: 8
+    }
+  }, "VoiceMemo AI"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 15,
+      color: "#8E8E93",
+      marginBottom: 40,
+      textAlign: "center",
+      lineHeight: 1.6
+    }
+  }, "お名前を入力して開始してください"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%",
+      maxWidth: 280,
+      position: "relative",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Ic, {
+    n: "user",
+    size: 16,
+    color: "#8E8E93",
+    style: {
+      position: "absolute",
+      left: 14,
+      top: "50%",
+      transform: "translateY(-50%)"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: name,
+    onChange: e => {
+      setName(e.target.value);
+      setErr("");
     },
-      /*#__PURE__*/React.createElement(Ic, {
-        n:"user",size:16,color:"#8E8E93",
-        style:{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}
-      }),
-      /*#__PURE__*/React.createElement("input", {
-        type:"text",
-        value:name,
-        onChange:e=>{setName(e.target.value);setError("");},
-        onKeyDown:handleKey,
-        placeholder:"\u304a\u540d\u524d\uff08\u4f8b\uff1a\u7cf8\u8c37 \u5e78\u592a\uff09",
-        autoFocus:true,
-        style:{
-          width:"100%",padding:"14px 14px 14px 42px",
-          borderRadius:12,border:`1.5px solid ${name?"#007AFF":"rgba(60,60,67,.2)"}`,
-          fontSize:16,background:"#fff",color:"#1C1C1E",
-          WebkitUserSelect:"text",userSelect:"text",outline:"none"
-        }
-      })
-    ),
-
-    // エラー
-    error && /*#__PURE__*/React.createElement("p", {
-      style:{fontSize:13,color:"#FF3B30",marginBottom:8}
-    }, error),
-
-    // 開始ボタン
-    /*#__PURE__*/React.createElement("button", {
-      onClick:handleStart,
-      disabled:!name.trim(),
-      style:{
-        width:280,padding:"14px",borderRadius:12,border:"none",
-        background:name.trim()?"#007AFF":"rgba(0,122,255,.3)",
-        color:"#fff",fontSize:16,fontWeight:600,cursor:name.trim()?"pointer":"default",
-        marginTop:4
-      }
-    }, "\u958b\u59cb"),
-
-    /*#__PURE__*/React.createElement("p", {
-      style:{fontSize:11,color:"#8E8E93",marginTop:24,textAlign:"center",lineHeight:1.7}
-    }, "\u5165\u529b\u3057\u305f\u540d\u524d\u306f30\u65e5\u9593\u8a18\u61b6\u3055\u308c\u307e\u3059")
-  );
+    onKeyDown: e => {
+      if (e.key === "Enter") doStart();
+    },
+    placeholder: "お名前（例：糟谷 幸太）",
+    style: {
+      width: "100%",
+      padding: "14px 14px 14px 42px",
+      borderRadius: 12,
+      border: `1.5px solid ${name ? "#007AFF" : "rgba(60,60,67,.2)"}`,
+      fontSize: 16,
+      background: "#fff",
+      color: "#1C1C1E",
+      outline: "none",
+      WebkitUserSelect: "text",
+      userSelect: "text"
+    }
+  })), err && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "#FF3B30",
+      marginBottom: 8
+    }
+  }, err), /*#__PURE__*/React.createElement("button", {
+    onClick: doStart,
+    disabled: !name.trim(),
+    style: {
+      width: 280,
+      padding: "14px",
+      borderRadius: 12,
+      border: "none",
+      background: name.trim() ? "#007AFF" : "rgba(0,122,255,.3)",
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: 600,
+      cursor: name.trim() ? "pointer" : "default",
+      marginTop: 4
+    }
+  }, "開始"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: "#8E8E93",
+      marginTop: 24,
+      textAlign: "center",
+      lineHeight: 1.7
+    }
+  }, "入力した名前は30日間記憶されます"));
 }
-
 >
