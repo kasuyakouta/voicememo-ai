@@ -2398,66 +2398,54 @@ function HomeScreen({
     setProcessingId(rec.localId);
     try {
       const mimeType = mrRef.current?.mimeType || "audio/mp4";
-      const blob = new Blob(rec.chunks, {
-        type: mimeType
-      });
-      let driveFileId = null;
+      const blob = new Blob(rec.chunks, { type: mimeType });
 
-      // ④ Drive直接アップロード（driveSaveがONの場合）
-      if (driveSave) {
-        try {
-          const accessToken = sessionStorage.getItem("vm_access_token");
-          const ext = mimeType.includes("mp4") ? "m4a" : "webm";
-          const safeName = (rec.member || "recording").replace(/[^\w぀-ヿ一-鿿]/g, "_");
-          const filename = `${(rec.date || "").replace(/[: ]/g, "-").slice(0, 19)}_${safeName}.${ext}`;
-          const result = await uploadAudioToDrive(blob, filename, DRIVE_FOLDER_ID, accessToken);
-          driveFileId = result?.id || null;
-        } catch (driveErr) {
-          console.warn("[Drive] アップロード失敗（処理は継続）:", driveErr.message);
-        }
-      }
+      // base64変換
       const b64 = await new Promise(res => {
         const r = new FileReader();
         r.onloadend = () => res(r.result.split(",")[1]);
         r.readAsDataURL(blob);
       });
+
+      // GASに送信
       const data = await gasPost({
-        action: "transcribe",
-        member: rec.member,
-        interviewee: rec.interviewee,
-        meetingName: rec.meetingName,
-        saveToDrive: false,
-        // GAS側では保存しない（フロントで直接アップロード済み）
-        driveFileId: driveFileId,
-        // ④ Drive保存済みのファイルID
-        audio: b64,
-        mimeType: mimeType,
-        duration: rec.duration,
-        date: rec.date,
-        mode: rec.mode,
-        systemPrompt: PROMPTS[rec.mode].systemPrompt
+        action:       "transcribe",
+        member:       rec.member,
+        interviewee:  rec.interviewee,
+        meetingName:  rec.meetingName,
+        audio:        b64,
+        mimeType:     mimeType,
+        duration:     rec.duration,
+        date:         rec.date,
+        mode:         rec.mode,
+        systemPrompt: PROMPTS[rec.mode]?.systemPrompt || "",
+        driveFileId:  ""
       });
-      if (!data.sections) throw new Error("AI処理結果が取得できませんでした。GASのログを確認してください。id=" + data.id);
+
+      // GASエラーチェック
+      if (!data.success || data.error) {
+        throw new Error(data.error || "GASから成功レスポンスが返りませんでした");
+      }
+      if (!data.sections) {
+        throw new Error("AI要約データが返りませんでした（sections未返却）");
+      }
+
+      // ローカル状態を更新
       setLocalRecs(prev => prev.map(r => r.localId === rec.localId ? {
-        ...r,
-        processed: true,
-        sections: data.sections,
-        id: data.id
+        ...r, processed: true, sections: data.sections, id: data.id
       } : r));
+
+      // 履歴に追加
       if (onRecordSaved) onRecordSaved({
-        id: data.id,
-        date: rec.date,
-        duration: rec.duration,
-        member: rec.member,
-        interviewee: rec.interviewee,
-        meetingName: rec.meetingName,
-        mode: rec.mode,
-        sections: data.sections
+        id: data.id, date: rec.date, duration: rec.duration,
+        member: rec.member, interviewee: rec.interviewee,
+        meetingName: rec.meetingName, mode: rec.mode, sections: data.sections
       });
 
       if (mode === "interview" && rec.member) CACHE.prev.delete(rec.member);
+
     } catch (e) {
-      setError("処理に失敗しました: " + (e.message || "不明なエラー"));
+      setError("処理エラー: " + (e.message || "不明なエラー"));
     }
     setProcessingId(null);
   };
