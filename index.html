@@ -2435,7 +2435,7 @@ function HomeScreen({
       });
       if (mode === "interview" && rec.member) CACHE.prev.delete(rec.member);
     } catch (e) {
-      setError("処理に失敗しました。しばらくしてから再試行してください。");
+      setError("処理に失敗しました: " + (e.message || "不明なエラー"));
     }
     setProcessingId(null);
   };
@@ -3530,7 +3530,10 @@ function HistoryScreen({
 // APP ROOT
 // ================================================================
 function App() {
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem(AUTH_KEY) === "1");
+  const [authed, setAuthed] = useState(() => {
+    // vm_user が壊れてクリアされた場合は未認証扱い
+    return sessionStorage.getItem(AUTH_KEY) === "1" && !!sessionStorage.getItem("vm_user");
+  });
   const [screen, setScreen] = useState("home");
   const [mode, setMode] = useState("interview");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -3540,7 +3543,14 @@ function App() {
   // Googleログイン後にユーザー情報から自動設定
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      return JSON.parse(sessionStorage.getItem("vm_user") || "{}");
+      const saved = JSON.parse(sessionStorage.getItem("vm_user") || "{}");
+      // 文字化け検出：UTF-8をLatin-1で読んだ場合 ç,è,å 等の文字が連続する
+      if (saved.name && /[\xc0-\xff][\x80-\xbf]/.test(saved.name)) {
+        sessionStorage.removeItem("vm_user");
+        sessionStorage.removeItem("vm_auth_v1");
+        return {};
+      }
+      return saved;
     } catch {
       return {};
     }
