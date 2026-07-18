@@ -1,7 +1,7 @@
 // VoiceMemo AI - Service Worker
 // キャッシュ戦略: Cache First（オフラインでも動作）
 
-const CACHE_NAME = 'voicememo-ai-v5';
+const CACHE_NAME = 'voicememo-ai-v6';
 
 // キャッシュするアセット
 const ASSETS = [
