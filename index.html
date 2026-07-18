@@ -696,174 +696,87 @@ function ModeBadge({
 // PIN SCREEN
 // ================================================================
 const PIN_LABELS = ["", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"];
-function PinScreen({
-  onSuccess
-}) {
-  // GOOGLE_CLIENT_ID が設定済みの場合はGoogleログイン専用画面
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "absolute",
-      inset: 0,
-      background: C.bg,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 999,
-      padding: 32
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 72,
-      height: 72,
-      borderRadius: 20,
-      background: `${C.blue}15`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 20
-    }
-  }, /*#__PURE__*/React.createElement(Ic, {
-    n: "microphone",
-    size: 32,
-    color: C.blue
-  })), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 24,
-      fontWeight: 700,
-      color: C.text,
-      marginBottom: 8
-    }
-  }, "VoiceMemo AI"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 15,
-      color: C.text2,
-      marginBottom: 40,
-      textAlign: "center",
-      lineHeight: 1.6
-    }
-  }, "\u793E\u5185\u30A2\u30AB\u30A6\u30F3\u30C8\u3067\u30ED\u30B0\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044"), /*#__PURE__*/React.createElement(GoogleLoginButton, {
-    onSuccess: onSuccess
-  }), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 11,
-      color: C.text2,
-      marginTop: 32,
-      textAlign: "center",
-      lineHeight: 1.7
-    }
-  }, "Google\u30A2\u30AB\u30A6\u30F3\u30C8\u3067\u30ED\u30B0\u30A4\u30F3\u3067\u304D\u307E\u3059"));
-}
+function PinScreen({onSuccess}) {
+  const [name, setName] = React.useState("");
+  const [error, setError] = React.useState("");
 
-// ================================================================
-// 9. Google ログインコンポーネント（GOOGLE_CLIENT_ID設定時のみ使用）
-// ================================================================
-// ================================================================
-// ④ Google Drive 直接アップロード（長時間録音対応）
-// ================================================================
-async function uploadAudioToDrive(blob, filename, folderId, accessToken) {
-  if (!accessToken) throw new Error("アクセストークンがありません");
+  const handleStart = () => {
+    const trimmed = name.trim();
+    if (!trimmed) { setError("\u540d\u524d\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044"); return; }
+    const userInfo = { name: trimmed, email: "", picture: "" };
+    localStorage.setItem(AUTH_KEY, JSON.stringify({value:"1", expires: Date.now()+30*24*60*60*1000}));
+    localStorage.setItem("vm_user", JSON.stringify(userInfo));
+    onSuccess(userInfo);
+  };
 
-  // multipart/form-data でDrive APIに直接アップロード
-  const metadata = JSON.stringify({
-    name: filename,
-    parents: [folderId]
-  });
-  const boundary = "voicememo_boundary_" + Date.now();
-  const delimiter = "--" + boundary;
-  const closeDelimiter = "--" + boundary + "--";
-
-  // Blobをbase64に変換
-  const arrayBuffer = await blob.arrayBuffer();
-  const uint8 = new Uint8Array(arrayBuffer);
-  let binary = "";
-  uint8.forEach(b => binary += String.fromCharCode(b));
-  const b64 = btoa(binary);
-  const body = [delimiter, "Content-Type: application/json; charset=UTF-8", "", metadata, delimiter, `Content-Type: ${blob.type || "audio/mp4"}`, "Content-Transfer-Encoding: base64", "", b64, closeDelimiter].join("\r\n");
-  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer " + accessToken,
-      "Content-Type": `multipart/related; boundary=${boundary}`
-    },
-    body
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || "Drive upload failed");
-  }
-  return res.json(); // {id, webViewLink}
-}
-
-// JWT デコード（Base64）
-// UTF-8をLatin-1として誤読した文字列を修復する
-function fixGarbledUtf8(str) {
-  if (!str) return str;
-  try {
-    // 各文字をバイト値として取得し、UTF-8として再デコード
-    const bytes = Uint8Array.from(Array.from(str).map(c => c.charCodeAt(0) & 0xFF));
-    const decoded = new TextDecoder('utf-8').decode(bytes);
-    // デコード後に日本語が含まれていれば修復成功
-    return decoded;
-  } catch {
-    return str;
-  }
-}
-
-function parseJwt(token) {
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    // UTF-8 文字（日本語等）を正しくデコード
-    const jsonStr = decodeURIComponent(
-      atob(base64).split('').map(c =>
-        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-      ).join('')
-    );
-    return JSON.parse(jsonStr);
-  } catch {
-    return {};
-  }
-}
-function GoogleLoginButton({
-  onSuccess
-}) {
-  const onSuccessRef = useRef(onSuccess);
-  onSuccessRef.current = onSuccess;
-
-  useEffect(() => {
-    // カスタムイベントでReact状態を更新
-    const handler = e => {
-      onSuccessRef.current(e.detail);
-    };
-    window.addEventListener('googleSignInSuccess', handler);
-    return () => window.removeEventListener('googleSignInSuccess', handler);
-  }, []);
-
-  if (!GOOGLE_CLIENT_ID) return null;
+  const handleKey = e => { if (e.key === "Enter") handleStart(); };
 
   return /*#__PURE__*/React.createElement("div", {
-    style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 8 }
+    style: {
+      position:"absolute", inset:0, background:"#F2F2F7",
+      display:"flex", flexDirection:"column", alignItems:"center",
+      justifyContent:"center", padding:32, zIndex:999
+    }
   },
-    // Google公式ボタン（HTML属性ベース・最も確実）
+    // ロゴ
     /*#__PURE__*/React.createElement("div", {
-      id: "g_id_onload",
-      "data-client_id": GOOGLE_CLIENT_ID,
-      "data-context": "signin",
-      "data-ux_mode": "popup",
-      "data-callback": "handleGoogleSignIn",
-      "data-auto_prompt": "true",
-      "data-itp_support": "true"
-    }),
+      style: {width:72,height:72,borderRadius:20,background:"rgba(0,122,255,.12)",
+        display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}
+    }, /*#__PURE__*/React.createElement(Ic, {n:"microphone",size:32,color:"#007AFF"})),
+
+    /*#__PURE__*/React.createElement("p", {
+      style:{fontSize:24,fontWeight:700,color:"#1C1C1E",marginBottom:8}
+    }, "VoiceMemo AI"),
+
+    /*#__PURE__*/React.createElement("p", {
+      style:{fontSize:15,color:"#8E8E93",marginBottom:40,textAlign:"center",lineHeight:1.6}
+    }, "\u304a\u540d\u524d\u3092\u5165\u529b\u3057\u3066\u958b\u59cb\u3057\u3066\u304f\u3060\u3055\u3044"),
+
+    // 名前入力欄
     /*#__PURE__*/React.createElement("div", {
-      className: "g_id_signin",
-      "data-type": "standard",
-      "data-shape": "rectangular",
-      "data-theme": "outline",
-      "data-text": "signin_with",
-      "data-size": "large",
-      "data-locale": "ja",
-      "data-width": "280"
-    })
+      style:{width:"100%",maxWidth:280,marginBottom:12,position:"relative"}
+    },
+      /*#__PURE__*/React.createElement(Ic, {
+        n:"user",size:16,color:"#8E8E93",
+        style:{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}
+      }),
+      /*#__PURE__*/React.createElement("input", {
+        type:"text",
+        value:name,
+        onChange:e=>{setName(e.target.value);setError("");},
+        onKeyDown:handleKey,
+        placeholder:"\u304a\u540d\u524d\uff08\u4f8b\uff1a\u7cf8\u8c37 \u5e78\u592a\uff09",
+        autoFocus:true,
+        style:{
+          width:"100%",padding:"14px 14px 14px 42px",
+          borderRadius:12,border:`1.5px solid ${name?"#007AFF":"rgba(60,60,67,.2)"}`,
+          fontSize:16,background:"#fff",color:"#1C1C1E",
+          WebkitUserSelect:"text",userSelect:"text",outline:"none"
+        }
+      })
+    ),
+
+    // エラー
+    error && /*#__PURE__*/React.createElement("p", {
+      style:{fontSize:13,color:"#FF3B30",marginBottom:8}
+    }, error),
+
+    // 開始ボタン
+    /*#__PURE__*/React.createElement("button", {
+      onClick:handleStart,
+      disabled:!name.trim(),
+      style:{
+        width:280,padding:"14px",borderRadius:12,border:"none",
+        background:name.trim()?"#007AFF":"rgba(0,122,255,.3)",
+        color:"#fff",fontSize:16,fontWeight:600,cursor:name.trim()?"pointer":"default",
+        marginTop:4
+      }
+    }, "\u958b\u59cb"),
+
+    /*#__PURE__*/React.createElement("p", {
+      style:{fontSize:11,color:"#8E8E93",marginTop:24,textAlign:"center",lineHeight:1.7}
+    }, "\u5165\u529b\u3057\u305f\u540d\u524d\u306f30\u65e5\u9593\u8a18\u61b6\u3055\u308c\u307e\u3059")
   );
 }
+
 >
