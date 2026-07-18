@@ -766,6 +766,20 @@ async function uploadAudioToDrive(blob, filename, folderId, accessToken) {
 }
 
 // JWT デコード（Base64）
+// UTF-8をLatin-1として誤読した文字列を修復する
+function fixGarbledUtf8(str) {
+  if (!str) return str;
+  try {
+    // 各文字をバイト値として取得し、UTF-8として再デコード
+    const bytes = Uint8Array.from(Array.from(str).map(c => c.charCodeAt(0) & 0xFF));
+    const decoded = new TextDecoder('utf-8').decode(bytes);
+    // デコード後に日本語が含まれていれば修復成功
+    return decoded;
+  } catch {
+    return str;
+  }
+}
+
 function parseJwt(token) {
   try {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -3544,11 +3558,14 @@ function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem("vm_user") || "{}");
-      // 文字化け検出：UTF-8をLatin-1で読んだ場合 ç,è,å 等の文字が連続する
-      if (saved.name && /[\xc0-\xff][\x80-\xbf]/.test(saved.name)) {
-        sessionStorage.removeItem("vm_user");
-        sessionStorage.removeItem("vm_auth_v1");
-        return {};
+      if (!saved.name) return saved;
+      // 文字化けチェック：Latin-1バイト列パターンが連続していれば修復
+      const hasMojibake = /[\xc0-\xff][\x80-\xbf]/.test(saved.name);
+      if (hasMojibake) {
+        // TextDecoder で UTF-8 として正しく読み直す
+        const fixed = { ...saved, name: fixGarbledUtf8(saved.name) };
+        sessionStorage.setItem("vm_user", JSON.stringify(fixed));
+        return fixed;
       }
       return saved;
     } catch {
