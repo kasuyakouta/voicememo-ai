@@ -1649,9 +1649,14 @@ function HomeScreen({
           return false;
         }
       }) || "";
-      const mr = new MediaRecorder(s, mime ? {
-        mimeType: mime
-      } : {});
+      // 音声専用のため低ビットレート（32kbps）でファイルサイズを削減
+      const mrOpts = mime ? {
+        mimeType: mime,
+        audioBitsPerSecond: 32000
+      } : {
+        audioBitsPerSecond: 32000
+      };
+      const mr = new MediaRecorder(s, mrOpts);
       chunksRef.current = [];
       mr.ondataavailable = e => e.data.size > 0 && chunksRef.current.push(e.data);
       mr.onstop = () => {
@@ -1712,6 +1717,18 @@ function HomeScreen({
       const blob = new Blob(rec.chunks, {
         type: mimeType
       });
+      // ファイルサイズチェック（30MB超は警告）
+      const fileSizeMB = Math.round(blob.size / 1024 / 1024);
+      if (blob.size > 40 * 1024 * 1024) {
+        throw new Error(`音声ファイルが大きすぎます（${fileSizeMB}MB）。GASの上限は約40MBです。録音を分割するか、短い録音でお試しください。`);
+      }
+      if (blob.size > 25 * 1024 * 1024) {
+        const ok = window.confirm(`音声ファイルが${fileSizeMB}MBと大きいです。処理に時間がかかる場合があります。続行しますか？`);
+        if (!ok) {
+          setProcessingId(null);
+          return;
+        }
+      }
       const b64 = await new Promise(res => {
         const r = new FileReader();
         r.onloadend = () => res(r.result.split(",")[1]);
@@ -1748,7 +1765,11 @@ function HomeScreen({
         sections: data.sections
       });
     } catch (e) {
-      setError("処理エラー: " + (e.message || "不明なエラー"));
+      let msg = e.message || "不明なエラー";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        msg = "通信エラー: ファイルが大きすぎるかタイムアウトしました。短い録音に分けて試してください。";
+      }
+      setError("処理エラー: " + msg);
     }
     setProcessingId(null);
   };
