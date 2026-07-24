@@ -1704,7 +1704,25 @@ function HomeScreen({
       lsSaveSuggestion(interviewee);
       setSuggestions(lsGetSuggestions());
     }
-    if (autoProcess) setTimeout(() => processRec(newRec), 300);
+    // 録音完了時点で基本情報を先行保存（エラー時も記録を残す）
+    gasPost({
+      action: "saveRecord",
+      member: member || "",
+      interviewee: interviewee || "",
+      meetingName: meetingName || "",
+      duration: fmt(savedTimer.current || timer),
+      date: savedDate.current,
+      mode
+    }).then(d => {
+      if (d.success && d.id) {
+        setRecs(prev => prev.map(r => r.localId === newRec.localId ? {
+          ...r,
+          id: d.id
+        } : r));
+        newRec.id = d.id; // processRec で参照するために更新
+      }
+    }).catch(() => {}); // 先行保存のエラーは無視（processRecで再試行）
+    if (autoProcess) setTimeout(() => processRec(newRec), 500);
   };
   const processRec = async rec => {
     if (!isOnline) {
@@ -1734,6 +1752,8 @@ function HomeScreen({
         r.onloadend = () => res(r.result.split(",")[1]);
         r.readAsDataURL(blob);
       });
+      // すでにIDがある場合（先行保存済み）はtranscribeのみ実行してupdateRecordで更新
+      const recId = rec.id; // 先行保存で取得済みのID
       const data = await gasPost({
         action: "transcribe",
         member: rec.member,
@@ -1744,18 +1764,20 @@ function HomeScreen({
         duration: rec.duration,
         date: rec.date,
         mode: rec.mode,
-        systemPrompt: PROMPTS[rec.mode]?.systemPrompt || ""
-      });
+        systemPrompt: PROMPTS[rec.mode]?.systemPrompt || "",
+        existingId: recId || null
+      }); // 既存IDを渡す
       if (!data.success || data.error) throw new Error(data.error || "GASエラー");
       if (!data.sections) throw new Error("AI要約データが返りませんでした");
+      const finalId = data.id || recId;
       setRecs(prev => prev.map(r => r.localId === rec.localId ? {
         ...r,
         processed: true,
         sections: data.sections,
-        id: data.id
+        id: finalId
       } : r));
       if (onRecordSaved) onRecordSaved({
-        id: data.id,
+        id: finalId,
         date: rec.date,
         duration: rec.duration,
         member: rec.member,
