@@ -1722,7 +1722,7 @@ function HomeScreen({
         newRec.id = d.id; // processRec で参照するために更新
       }
     }).catch(() => {}); // 先行保存のエラーは無視（processRecで再試行）
-    if (autoProcess) setTimeout(() => processRec(newRec), 500);
+    if (autoProcess) setTimeout(() => processRec(newRec), 2000);
   };
   const processRec = async rec => {
     if (!isOnline) {
