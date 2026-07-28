@@ -1512,6 +1512,37 @@ function HomeScreen({
     return () => clearInterval(timerRef.current);
   }, [recState]);
   const isActive = recState === "recording" || recState === "paused";
+  const wakeLockRef = useRef(null);
+  const requestWakeLock = async () => {
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+      }
+    } catch (e) {
+      console.warn("[WakeLock] 取得失敗:", e.message);
+    }
+  };
+  const releaseWakeLock = () => {
+    try {
+      wakeLockRef.current?.release();
+      wakeLockRef.current = null;
+    } catch {}
+  };
+
+  // 画面が再表示された時にWake Lockを再取得（バックグラウンド復帰対応）
+  useEffect(() => {
+    const onVisChange = () => {
+      if (document.visibilityState === "visible" && recStateRef.current === "recording") {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisChange);
+    return () => document.removeEventListener("visibilitychange", onVisChange);
+  }, []);
+  const recStateRef = useRef("idle");
+  useEffect(() => {
+    recStateRef.current = recState;
+  }, [recState]);
   const startRec = async () => {
     if (!isOnline) {
       setError("オフラインです。接続を確認してください。");
@@ -1541,6 +1572,7 @@ function HomeScreen({
       mr.onstop = () => {
         s.getTracks().forEach(t => t.stop());
         setStream(null);
+        releaseWakeLock();
       };
       mr.start(100);
       mrRef.current = mr;
@@ -1549,6 +1581,7 @@ function HomeScreen({
       setTimer(0);
       savedTimer.current = 0;
       if (onRecordingChange) onRecordingChange(true);
+      await requestWakeLock(); // 画面ロック防止
     } catch {
       alert("マイクへのアクセスを許可してください。");
     }
@@ -1557,6 +1590,7 @@ function HomeScreen({
     savedTimer.current = timer;
     savedDate.current = nowStr();
     mrRef.current?.stop();
+    releaseWakeLock();
     const blob = new Blob(chunksRef.current, {
       type: mrRef.current?.mimeType || "audio/mp4"
     });
@@ -2214,7 +2248,15 @@ function HomeScreen({
       color: C.text2,
       marginTop: 6
     }
-  }, recState === "recording" ? "タップして停止" : recState === "paused" ? "再開または停止" : "タップして録音"), recState === "idle" && /*#__PURE__*/React.createElement("div", {
+  }, recState === "recording" ? "タップして停止" : recState === "paused" ? "再開または停止" : "タップして録音"), isActive && !("wakeLock" in navigator) && /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 10,
+      color: C.orange,
+      marginTop: 4,
+      padding: "0 20px"
+    }
+  }, "⚠️ この端末は自動画面ロック防止に非対応です。録音中は画面を手動でつけたままにしてください。"), recState === "idle" && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
