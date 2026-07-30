@@ -534,7 +534,8 @@ function Ic({
   n,
   size = 16,
   color,
-  style: s = {}
+  style: s = {},
+  cls = ""
 }) {
   const ico = SVG_ICONS[n];
   if (!ico) return null;
@@ -544,6 +545,7 @@ function Ic({
     width: size,
     height: size,
     fill: color || "currentColor",
+    className: cls,
     style: {
       display: "inline-block",
       verticalAlign: "middle",
