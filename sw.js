@@ -1,7 +1,7 @@
 // VoiceMemo AI - Service Worker
 // キャッシュ戦略: Cache First（オフラインでも動作）
 
-const CACHE_NAME = 'voicememo-ai-v6';
+const CACHE_NAME = 'voicememo-ai-v7';
 
 // キャッシュするアセット
 const ASSETS = [
@@ -33,10 +33,12 @@ self.addEventListener('activate', event => {
 
 // ─── フェッチ：Cache First → Network Fallback ───
 self.addEventListener('fetch', event => {
-  // GAS API リクエストはキャッシュしない（常に最新データを取得）
-  if (event.request.url.includes('script.google.com')) {
-    event.respondWith(fetch(event.request));
-    return;
+  // GAS API リクエストは一切介入しない（SWを完全バイパス）
+  // 理由：GASは302リダイレクトを返すため、SW経由での転送は
+  //       大きなPOSTリクエスト（音声データ）で失敗することがある
+  if (event.request.url.includes('script.google.com') ||
+      event.request.url.includes('googleusercontent.com')) {
+    return; // respondWithを呼ばない = ブラウザのネイティブfetchに完全に任せる
   }
 
   event.respondWith(

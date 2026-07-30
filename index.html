@@ -404,20 +404,46 @@ const SYSTEM_PROMPT = `面談記録として重要な情報を構造化して抽
 
 // ── UTILS ───────────────────────────────────────────────
 async function gasGet(p) {
-  const r = await fetch(GAS_URL + "?" + new URLSearchParams(p));
+  let r;
+  try {
+    r = await fetch(GAS_URL + "?" + new URLSearchParams(p));
+  } catch (e) {
+    throw new Error("通信に失敗しました: " + e.message);
+  }
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  let json;
+  try {
+    json = await r.json();
+  } catch {
+    throw new Error("サーバー応答の解析に失敗しました");
+  }
+  if (json == null || typeof json !== "object") throw new Error("サーバーからの応答が空でした");
+  return json;
 }
 async function gasPost(b) {
-  const r = await fetch(GAS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain"
-    },
-    body: JSON.stringify(b)
-  });
+  let r;
+  try {
+    r = await fetch(GAS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain"
+      },
+      body: JSON.stringify(b)
+    });
+  } catch (e) {
+    throw new Error("通信に失敗しました。Service Workerまたはネットワークの問題の可能性があります: " + e.message);
+  }
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  let json;
+  try {
+    json = await r.json();
+  } catch (e) {
+    throw new Error("サーバーからの応答が不正でした（JSON解析失敗）");
+  }
+  if (json == null || typeof json !== "object") {
+    throw new Error("サーバーからの応答が空でした");
+  }
+  return json;
 }
 function fmt(s) {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
