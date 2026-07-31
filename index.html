@@ -398,9 +398,31 @@ const C = {
 };
 
 // ── SYSTEM PROMPT（面談専用）───────────────────────────
-const SYSTEM_PROMPT = `面談記録として重要な情報を構造化して抽出してください。
-【出力形式】{"sections":[{"key":"goal","label":"今日のゴール","emoji":"🎯","items":["..."]},{"key":"voice","label":"本人の声","emoji":"💬","items":["..."]},{"key":"action","label":"アクション","emoji":"✅","items":["..."]},{"key":"follow","label":"フォロー事項","emoji":"📅","items":["..."]}]}
-各2〜4項目。情報がない場合は["特になし"]`;
+const SYSTEM_PROMPT = `面談記録として重要な情報を構造化して抽出し、加えて面談の質を分析してください。
+
+【出力形式】
+{
+  "sections":[
+    {"key":"goal","label":"今日のゴール","emoji":"🎯","items":["..."]},
+    {"key":"voice","label":"本人の声","emoji":"💬","items":["..."]},
+    {"key":"action","label":"アクション","emoji":"✅","items":["..."]},
+    {"key":"follow","label":"フォロー事項","emoji":"📅","items":["..."]}
+  ],
+  "analysis":{
+    "speakingRatio":{"self":<面談担当者の発話割合(数値0-100)>,"other":<相手の発話割合(数値0-100)>},
+    "listeningScore":<傾聴度スコア(数値0-100)>,
+    "listeningComment":"<傾聴度についての一言コメント（30文字程度）>",
+    "openQuestionRatio":<オープンクエスチョンの割合(数値0-100)>
+  }
+}
+
+【sections】各2〜4項目。情報がない場合は["特になし"]
+
+【analysis】
+- speakingRatio: 面談担当者（進行する側）と相手（面談される側）の発話量の割合。self+other=100になるようにしてください。
+- listeningScore: 相手の発言を受けて深掘りする質問ができているか、話を遮っていないか等から算出。
+- openQuestionRatio: 「はい/いいえ」で終わる質問ではなく、「なぜ」「どう思う」等の深掘りする質問の割合。
+- 文字起こしのみからの推定であることを前提に、妥当な数値を出してください。`;
 
 // ── UTILS ───────────────────────────────────────────────
 async function gasGet(p) {
@@ -1088,6 +1110,7 @@ function SummaryModal({
   const [msg, setMsg] = useState("");
   const secs = item.sections?.sections || [];
   const transcript = item.sections?._transcript || "";
+  const analysis = item.sections?.analysis || null;
   const toggleCollapse = key => setCollapsed(s => {
     const n = new Set(s);
     n.has(key) ? n.delete(key) : n.add(key);
@@ -1284,7 +1307,56 @@ function SummaryModal({
         margin: 0
       }
     }, transcript)));
-  })(), /*#__PURE__*/React.createElement("div", {
+  })(), analysis && /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 12,
+      border: `1px solid ${C.sep}`,
+      background: C.bg,
+      padding: "12px 14px",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 12, fontWeight: 600, color: C.text2, marginBottom: 10 }
+  }, "\ud83d\udcca \u9762\u8ac7\u5206\u6790"),
+  // \u767a\u8a71\u5272\u5408\u30d0\u30fc
+  analysis.speakingRatio && /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: C.text2, marginBottom: 4 }
+    },
+      /*#__PURE__*/React.createElement("span", null, `\u3042\u306a\u305f ${analysis.speakingRatio.self}%`),
+      /*#__PURE__*/React.createElement("span", null, `\u76f8\u624b ${analysis.speakingRatio.other}%`)
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", height: 8, borderRadius: 4, overflow: "hidden", background: C.sep }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { width: `${analysis.speakingRatio.self}%`, background: C.blue } }),
+      /*#__PURE__*/React.createElement("div", { style: { width: `${analysis.speakingRatio.other}%`, background: C.purple } })
+    )
+  ),
+  // \u50be\u8074\u5ea6\u30b9\u30b3\u30a2
+  typeof analysis.listeningScore === "number" && /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: 10, marginBottom: analysis.listeningComment ? 4 : 0 }
+  },
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: C.text2, flexShrink: 0 } }, "\u50be\u8074\u5ea6"),
+    /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, height: 6, borderRadius: 3, background: C.sep, overflow: "hidden" }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: `${analysis.listeningScore}%`, height: "100%",
+          background: analysis.listeningScore >= 70 ? C.green : analysis.listeningScore >= 40 ? C.orange : C.red
+        }
+      })
+    ),
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: C.text, flexShrink: 0 } }, `${analysis.listeningScore}`)
+  ),
+  analysis.listeningComment && /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 11, color: C.text2, marginTop: 2 }
+  }, analysis.listeningComment),
+  typeof analysis.openQuestionRatio === "number" && /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 11, color: C.text2, marginTop: 8 }
+  }, `\ud83d\udca1 \u30aa\u30fc\u30d7\u30f3\u8cea\u554f\u5272\u5408: ${analysis.openQuestionRatio}%`)
+  ), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -2982,8 +3054,7 @@ function App() {
     newRecord: newRecord
   })));
 }
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));</script>
-<script>
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));</script><script>
 if('serviceWorker'in navigator&&!location.hostname.includes('claudeusercontent')){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(r=>r.update()).catch(()=>{});
