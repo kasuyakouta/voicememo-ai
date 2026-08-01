@@ -1599,6 +1599,7 @@ function HomeScreen({
   const mrRef = useRef(null),
     chunksRef = useRef([]),
     timerRef = useRef(null);
+  const processingRef = useRef(new Set());
   const savedTimer = useRef(0),
     savedDate = useRef("");
   useEffect(() => {
@@ -1696,8 +1697,9 @@ function HomeScreen({
     savedDate.current = nowStr();
     mrRef.current?.stop();
     releaseWakeLock();
+    const mimeType = mrRef.current?.mimeType || "audio/mp4";
     const blob = new Blob(chunksRef.current, {
-      type: mrRef.current?.mimeType || "audio/mp4"
+      type: mimeType
     });
     const url = URL.createObjectURL(blob);
     const localId = Date.now();
@@ -1711,6 +1713,7 @@ function HomeScreen({
       processed: false,
       sections: null,
       id: null,
+      mimeType,
       chunks: [...chunksRef.current]
     };
     setRecs(prev => [...prev, newRec]);
@@ -1736,17 +1739,22 @@ function HomeScreen({
         } : r));
         newRec.id = d.id;
       }
-    }).catch(() => {});
+    }).catch(e => {
+      setError("録音の保存に失敗しました: " + (e.message || "不明なエラー"));
+    });
     if (autoProcess) setTimeout(() => processRec(newRec), 2000);
   };
   const processRec = async rec => {
+    if (processingRef.current.has(rec.localId)) return;
+    processingRef.current.add(rec.localId);
     if (!isOnline) {
       setError("オフラインです。接続を確認してください。");
+      processingRef.current.delete(rec.localId);
       return;
     }
     setProcessingId(rec.localId);
     try {
-      const mimeType = mrRef.current?.mimeType || "audio/mp4";
+      const mimeType = rec.mimeType || "audio/mp4";
       const blob = new Blob(rec.chunks, {
         type: mimeType
       });
@@ -1758,6 +1766,7 @@ function HomeScreen({
         const ok = window.confirm(`音声ファイルが${fileSizeMB}MBと大きいです。処理に時間がかかる場合があります。続行しますか？`);
         if (!ok) {
           setProcessingId(null);
+          processingRef.current.delete(rec.localId);
           return;
         }
       }
@@ -1805,6 +1814,7 @@ function HomeScreen({
       setError("処理エラー: " + msg);
     }
     setProcessingId(null);
+    processingRef.current.delete(rec.localId);
   };
   const deleteRec = id => {
     setRecs(prev => prev.filter(r => r.localId !== id));
