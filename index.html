@@ -720,6 +720,7 @@ function Drawer({
   onClose,
   onNav,
   onLogout,
+  isRecording,
   userName
 }) {
   return /*#__PURE__*/React.createElement(React.Fragment, null, open && /*#__PURE__*/React.createElement("div", {
@@ -779,6 +780,10 @@ function Drawer({
   }].map(item => /*#__PURE__*/React.createElement("button", {
     key: item.key,
     onClick: () => {
+      if (isRecording) {
+        alert("録音を停止してから移動してください。");
+        return;
+      }
       onNav(item.key);
       onClose();
     },
@@ -1135,12 +1140,12 @@ function SummaryModal({
       setMsg("保存しました");
       if (onSaved) onSaved(draft);
       setTimeout(() => setMsg(""), 3000);
+      setEditing(false);
+      setDraft(null);
     } catch (e) {
       setMsg("保存失敗: " + e.message);
     }
     setSaving(false);
-    setEditing(false);
-    setDraft(null);
   };
   const buildText = () => {
     const t = `${item.member}${item.interviewee ? " → " + item.interviewee : ""}`;
@@ -2941,6 +2946,7 @@ function App() {
     onClose: () => setDrawerOpen(false),
     onNav: handleNav,
     onLogout: handleLogout,
+    isRecording: isRecording,
     userName: currentUser?.name || ""
   }), /*#__PURE__*/React.createElement("div", {
     style: {
