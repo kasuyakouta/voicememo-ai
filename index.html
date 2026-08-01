@@ -467,6 +467,64 @@ async function gasPost(b) {
   }
   return json;
 }
+
+// ── 未処理録音の永続化（IndexedDB）─────────────────────
+// transcribe失敗・アプリ再起動をまたいでも録音本体を失わないための保険。
+// 文字起こし成功時に該当エントリを削除する。
+const IDB_NAME = "vm_pending_audio";
+const IDB_STORE = "recordings";
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(IDB_STORE, {
+        keyPath: "localId"
+      });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbPut(rec) {
+  try {
+    const db = await idbOpen();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put(rec);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.warn("[IDB] 保存失敗:", e.message);
+  }
+}
+async function idbDelete(localId) {
+  try {
+    const db = await idbOpen();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).delete(localId);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.warn("[IDB] 削除失敗:", e.message);
+  }
+}
+async function idbGetAll() {
+  try {
+    const db = await idbOpen();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.warn("[IDB] 読込失敗:", e.message);
+    return [];
+  }
+}
 function fmt(s) {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
@@ -1602,6 +1660,41 @@ function HomeScreen({
   const processingRef = useRef(new Set());
   const savedTimer = useRef(0),
     savedDate = useRef("");
+  const idbRecordFrom = rec => ({
+    localId: rec.localId,
+    chunks: rec.chunks,
+    mimeType: rec.mimeType,
+    date: rec.date,
+    duration: rec.duration,
+    member: rec.member,
+    interviewee: rec.interviewee,
+    id: rec.id || null
+  });
+  // 未処理のまま残っている録音（前回transcribe失敗・アプリ再起動等）を復元
+  useEffect(() => {
+    idbGetAll().then(items => {
+      if (!items.length) return;
+      setRecs(prev => {
+        const known = new Set(prev.map(r => r.localId));
+        const restored = items.filter(it => !known.has(it.localId)).map(it => ({
+          localId: it.localId,
+          url: URL.createObjectURL(new Blob(it.chunks, {
+            type: it.mimeType
+          })),
+          date: it.date,
+          duration: it.duration,
+          member: it.member,
+          interviewee: it.interviewee,
+          processed: false,
+          sections: null,
+          id: it.id || null,
+          mimeType: it.mimeType,
+          chunks: it.chunks
+        }));
+        return restored.length ? [...restored, ...prev] : prev;
+      });
+    });
+  }, []);
   useEffect(() => {
     if (!member) return;
     gasGet({
@@ -1723,6 +1816,8 @@ function HomeScreen({
       lsSaveSuggestion(interviewee);
       setSuggestions(lsGetSuggestions());
     }
+    // 録音本体をIndexedDBに先行保存（transcribe失敗・アプリ再起動時の保険）
+    idbPut(idbRecordFrom(newRec));
     // 録音完了時点で基本情報を先行保存
     gasPost({
       action: "saveRecord",
@@ -1738,6 +1833,7 @@ function HomeScreen({
           id: d.id
         } : r));
         newRec.id = d.id;
+        idbPut(idbRecordFrom(newRec));
       }
     }).catch(e => {
       setError("録音の保存に失敗しました: " + (e.message || "不明なエラー"));
@@ -1797,6 +1893,7 @@ function HomeScreen({
         sections: data.sections,
         id: finalId
       } : r));
+      idbDelete(rec.localId);
       if (onRecordSaved) onRecordSaved({
         id: finalId,
         date: rec.date,
@@ -1818,6 +1915,7 @@ function HomeScreen({
   };
   const deleteRec = id => {
     setRecs(prev => prev.filter(r => r.localId !== id));
+    idbDelete(id);
     setConfirmDel(null);
   };
   const toggleAutoProcess = () => {
