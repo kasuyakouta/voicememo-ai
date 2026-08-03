@@ -564,9 +564,11 @@ function safeDur(s) {
   const str = String(s).replace(/^'/, "");
   if (/^\d{2}:\d{2}/.test(str)) return str.slice(0, 5);
   const d = new Date(str);
-  if (!isNaN(d.getTime()) && d.getFullYear() < 1970) {
-    const m = d.getHours() * 60 + d.getMinutes();
-    return `${String(m).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+  if (!isNaN(d.getTime()) && d.getUTCFullYear() < 1970) {
+    // 1970年より前＝Sheetsが「時刻」セルとしてUTC基準のシリアル値を返してきたケース。
+    // ローカルのgetHours/getMinutesで読むとタイムゾーン分ずれるため、必ずUTCで読む。
+    const m = d.getUTCHours() * 60 + d.getUTCMinutes();
+    return `${String(m).padStart(2, "0")}:${String(d.getUTCSeconds()).padStart(2, "0")}`;
   }
   return str;
 }
@@ -619,7 +621,9 @@ function lsGetAuto() {
   }
 }
 function lsSetAuto(v) {
-  localStorage.setItem("vm_auto", v ? "1" : "0");
+  try {
+    localStorage.setItem("vm_auto", v ? "1" : "0");
+  } catch {}
 }
 
 // ── ICON ────────────────────────────────────────────────
@@ -1198,7 +1202,7 @@ function SummaryModal({
     return n;
   });
   const startEdit = () => {
-    setDraft(JSON.parse(JSON.stringify(item.sections)));
+    setDraft(structuredClone(item.sections));
     setEditing(true);
   };
   const cancelEdit = () => {
@@ -1228,16 +1232,18 @@ function SummaryModal({
     let lines = [`【面談記録】${t}`, `日時：${item.date}　時間：${item.duration}`, ""];
     secs.forEach(s => {
       lines.push(`${s.emoji} ${s.label}`);
-      s.items.forEach(i => lines.push(`  ・${i}`));
+      (s.items || []).forEach(i => lines.push(`  ・${i}`));
       lines.push("");
     });
     return lines.join("\n").trim();
   };
-  const doCopy = () => {
+  const doCopy = async () => {
     try {
-      navigator.clipboard.writeText(buildText());
-    } catch {}
-    setMsg("コピーしました");
+      await navigator.clipboard.writeText(buildText());
+      setMsg("コピーしました");
+    } catch {
+      setMsg("コピーに失敗しました");
+    }
     setTimeout(() => setMsg(""), 2500);
   };
   const dispSecs = editing ? draft?.sections || [] : secs;
@@ -1551,7 +1557,7 @@ function SummaryModal({
     key: ii,
     value: it,
     onChange: e => {
-      const d = JSON.parse(JSON.stringify(draft));
+      const d = structuredClone(draft);
       d.sections[si].items[ii] = e.target.value;
       setDraft(d);
     },
@@ -1799,8 +1805,14 @@ function HomeScreen({
       savedTimer.current = 0;
       if (onRecordingChange) onRecordingChange(true);
       await requestWakeLock(); // 画面ロック防止
-    } catch {
-      alert("マイクへのアクセスを許可してください。");
+    } catch (e) {
+      const msgs = {
+        NotAllowedError: "マイクへのアクセスを許可してください。",
+        NotFoundError: "マイクが見つかりません。デバイスの接続を確認してください。",
+        NotReadableError: "マイクが他のアプリで使用中の可能性があります。他のアプリを閉じてから再度お試しください。",
+        SecurityError: "マイクへのアクセスがブロックされています。ブラウザの設定を確認してください。"
+      };
+      alert(msgs[e?.name] || "マイクを起動できませんでした。しばらくしてから再度お試しください。");
     }
   };
   const stopRec = () => {
@@ -1837,7 +1849,7 @@ function HomeScreen({
     // 録音本体をIndexedDBに先行保存（transcribe失敗・アプリ再起動時の保険）
     idbPut(idbRecordFrom(newRec));
     // 録音完了時点で基本情報を先行保存
-    gasPost({
+    const savePromise = gasPost({
       action: "saveRecord",
       member: member || "",
       interviewee: interviewee || "",
@@ -1856,7 +1868,10 @@ function HomeScreen({
     }).catch(e => {
       setError("録音の保存に失敗しました: " + (e.message || "不明なエラー"));
     });
-    if (autoProcess) setTimeout(() => processRec(newRec), 2000);
+    // saveRecordの完了（成功/失敗いずれも）を待ってからprocessRecを呼ぶ。
+    // 固定タイマーだとGASが遅い場合にnewRec.idがまだnullのままtranscribeが走り、
+    // Sheets側に重複行ができてしまうため。
+    if (autoProcess) savePromise.finally(() => processRec(newRec));
   };
   const processRec = async rec => {
     if (processingRef.current.has(rec.localId)) return;
@@ -3035,6 +3050,9 @@ function App() {
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [isRecording]);
+  useEffect(() => {
+    window.__vmIsRecording = isRecording;
+  }, [isRecording]);
   const handleLogin = u => {
     setCurrentUser(u);
     setMember(u.name || "");
@@ -3240,11 +3258,22 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+window.addEventListener('error', e => {
+  console.error('[UnhandledError]', e.error || e.message);
+});
+window.addEventListener('unhandledrejection', e => {
+  console.error('[UnhandledRejection]', e.reason);
+});
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(ErrorBoundary, null, React.createElement(App, null)));</script><script>
 if('serviceWorker'in navigator&&!location.hostname.includes('claudeusercontent')){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(r=>r.update()).catch(()=>{});
-    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if (reloaded || window.__vmIsRecording) return;
+      reloaded = true;
+      window.location.reload();
+    });
   });
 }
 </script>
