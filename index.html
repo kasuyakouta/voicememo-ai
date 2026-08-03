@@ -543,6 +543,19 @@ function nowStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
 }
+function normalizeSections(s) {
+  // GAS/Sheets経由で読み込んだ記録は、sectionsがJSON文字列のまま返ってくることがある
+  // （保存時にJSON.stringifyしたセル値をそのまま返している場合）。
+  // 文字列ならパースし、既にオブジェクトならそのまま使う。
+  if (typeof s === "string") {
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  }
+  return s || null;
+}
 function relDate(s) {
   if (!s) return "";
   const d = new Date(s);
@@ -1725,7 +1738,10 @@ function HomeScreen({
       offset: 0,
       member
     }).then(d => {
-      if (d.records && d.records[0]) setRecentRec(d.records[0]);
+      if (d.records && d.records[0]) setRecentRec({
+        ...d.records[0],
+        sections: normalizeSections(d.records[0].sections)
+      });
     }).catch(() => {});
   }, [member, resetKey]);
   useEffect(() => {
@@ -2588,7 +2604,10 @@ function HistoryScreen({
       };
       if (memberFilter) p.member = memberFilter;
       const d = await gasGet(p);
-      setRecords(d.records || []);
+      setRecords((d.records || []).map(r => ({
+        ...r,
+        sections: normalizeSections(r.sections)
+      })));
       setTotal(d.total || 0);
       setHasMore(d.hasMore || false);
       offsetRef.current = PAGE_SIZE;
@@ -2610,7 +2629,10 @@ function HistoryScreen({
       const d = await gasGet(p);
       setRecords(prev => {
         const ids = new Set(prev.map(r => r.id));
-        return [...prev, ...(d.records || []).filter(r => !ids.has(r.id))];
+        return [...prev, ...(d.records || []).filter(r => !ids.has(r.id)).map(r => ({
+          ...r,
+          sections: normalizeSections(r.sections)
+        }))];
       });
       setTotal(d.total || 0);
       setHasMore(d.hasMore || false);
