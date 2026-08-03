@@ -1750,16 +1750,28 @@ function HomeScreen({
   }, [recState]);
   const isActive = recState === "recording" || recState === "paused";
   const wakeLockRef = useRef(null);
+  const wantWakeLockRef = useRef(false);
   const requestWakeLock = async () => {
     try {
-      if ("wakeLock" in navigator) {
-        wakeLockRef.current = await navigator.wakeLock.request("screen");
+      if (!("wakeLock" in navigator)) {
+        console.warn("[WakeLock] このブラウザ/OSはWake Lock APIに非対応です");
+        return;
       }
+      wakeLockRef.current = await navigator.wakeLock.request("screen");
+      // OS都合（省電力モード等）で録音継続中に勝手に解放されることがあるため、
+      // その場合はここで検知して再取得を試みる（visibilitychangeだけでは検知できない）。
+      wakeLockRef.current.addEventListener("release", () => {
+        if (wantWakeLockRef.current && document.visibilityState === "visible") {
+          requestWakeLock();
+        }
+      });
     } catch (e) {
       console.warn("[WakeLock] 取得失敗:", e.message);
+      setError("画面ロック防止の設定に失敗しました。録音中は画面を触ったままにするか、「設定」アプリの自動ロックを「なし」にすることをおすすめします。");
     }
   };
   const releaseWakeLock = () => {
+    wantWakeLockRef.current = false;
     try {
       wakeLockRef.current?.release();
       wakeLockRef.current = null;
@@ -1818,6 +1830,7 @@ function HomeScreen({
       setTimer(0);
       savedTimer.current = 0;
       if (onRecordingChange) onRecordingChange(true);
+      wantWakeLockRef.current = true;
       await requestWakeLock(); // 画面ロック防止
     } catch (e) {
       const msgs = {
