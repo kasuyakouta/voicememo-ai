@@ -425,19 +425,22 @@ const SYSTEM_PROMPT = `面談記録として重要な情報を構造化して抽
 - 文字起こしのみからの推定であることを前提に、妥当な数値を出してください。`;
 
 // ── UTILS ───────────────────────────────────────────────
+function timeoutError(msg) {
+  const e = new Error(msg);
+  e.isTimeout = true;
+  return e;
+}
+// GASはPOST/GETに対して302リダイレクトで応答する。AbortControllerで実際に
+// fetchを中断すると、iOS Safari(WebKit)ではリダイレクト処理と衝突してfetchが
+// 二度と解決しなくなることがあるため、fetch自体は中断せずPromise.raceで
+// 「待つのをあきらめる」方式にする（fetchはバックグラウンドで走り続けるが無害）。
 async function gasGet(p, timeoutMs = 30000) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let r;
   try {
-    r = await fetch(GAS_URL + "?" + new URLSearchParams(p), {
-      signal: ctrl.signal
-    });
+    r = await Promise.race([fetch(GAS_URL + "?" + new URLSearchParams(p)), new Promise((_, reject) => setTimeout(() => reject(timeoutError("通信がタイムアウトしました。ネットワーク状況を確認して再試行してください。")), timeoutMs))]);
   } catch (e) {
-    if (e.name === "AbortError") throw new Error("通信がタイムアウトしました。ネットワーク状況を確認して再試行してください。");
+    if (e.isTimeout) throw e;
     throw new Error("通信に失敗しました: " + e.message);
-  } finally {
-    clearTimeout(timer);
   }
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   let json;
@@ -450,23 +453,18 @@ async function gasGet(p, timeoutMs = 30000) {
   return json;
 }
 async function gasPost(b, timeoutMs = 30000) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let r;
   try {
-    r = await fetch(GAS_URL, {
+    r = await Promise.race([fetch(GAS_URL, {
       method: "POST",
       headers: {
         "Content-Type": "text/plain"
       },
-      body: JSON.stringify(b),
-      signal: ctrl.signal
-    });
+      body: JSON.stringify(b)
+    }), new Promise((_, reject) => setTimeout(() => reject(timeoutError("通信がタイムアウトしました。時間をおいて再試行してください。")), timeoutMs))]);
   } catch (e) {
-    if (e.name === "AbortError") throw new Error("通信がタイムアウトしました。時間をおいて再試行してください。");
+    if (e.isTimeout) throw e;
     throw new Error("通信に失敗しました。Service Workerまたはネットワークの問題の可能性があります: " + e.message);
-  } finally {
-    clearTimeout(timer);
   }
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   let json;
@@ -2655,7 +2653,7 @@ function HistoryScreen({
     }
     setDeleting(false);
   };
-  const filtered = records.filter(item => !q || (item.sections?._transcript || "").includes(q) || (item.sections?.sections || []).some(s => s.items.some(i => i.includes(q))) || (item.member || "").includes(q) || (item.interviewee || "").includes(q));
+  const filtered = records.filter(item => !q || (item.sections?._transcript || "").includes(q) || (item.sections?.sections || []).some(s => (s.items || []).some(i => i.includes(q))) || (item.member || "").includes(q) || (item.interviewee || "").includes(q));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
