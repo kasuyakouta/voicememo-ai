@@ -1663,7 +1663,15 @@ function SummaryModal({
       fontSize: 11,
       color: C.text2
     }
-  }, "箇条書きのみ")))))));
+  }, "箇条書きのみ"))), msg && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: msg.includes("失敗") ? C.red : C.green,
+      textAlign: "center",
+      marginTop: 10
+    }
+  }, msg)))));
 }
 
 // ── HOME SCREEN ───────────────────────────────────────────
