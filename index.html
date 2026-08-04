@@ -1854,7 +1854,10 @@ function HomeScreen({
     savedTimer.current = timer;
     savedDate.current = nowStr();
     mrRef.current?.stop();
-    releaseWakeLock();
+    // 自動処理する場合はprocessRec側で解放するまでWake Lockを保持する
+    // （ここで解放すると、AI処理待ちの間に画面がロックされ、処理中の通信が
+    // iOS Safariに切断されてしまうことがあるため）。
+    if (!autoProcess) releaseWakeLock();
     const mimeType = mrRef.current?.mimeType || "audio/mp4";
     const blob = new Blob(chunksRef.current, {
       type: mimeType
@@ -1917,6 +1920,10 @@ function HomeScreen({
       return;
     }
     setProcessingId(rec.localId);
+    // アップロード〜AI処理の待ち時間も画面ロックを防止する（録音停止時点では
+    // まだ解放していない場合もあるが、手動処理や再取得のケースに備えて確実に取得する）。
+    wantWakeLockRef.current = true;
+    await requestWakeLock();
     try {
       const mimeType = rec.mimeType || "audio/mp4";
       const blob = new Blob(rec.chunks, {
@@ -1929,6 +1936,7 @@ function HomeScreen({
       if (blob.size > 25 * 1024 * 1024) {
         const ok = window.confirm(`音声ファイルが${fileSizeMB}MBと大きいです。処理に時間がかかる場合があります。続行しますか？`);
         if (!ok) {
+          releaseWakeLock();
           setProcessingId(null);
           processingRef.current.delete(rec.localId);
           return;
@@ -1980,11 +1988,12 @@ function HomeScreen({
       });
     } catch (e) {
       let msg = e.message || "不明なエラー";
-      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        msg = "通信エラー: ファイルが大きすぎるかタイムアウトしました。短い録音に分けて試してください。";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Load failed")) {
+        msg = "通信が切断されました（AI処理中に画面がロックされた可能性があります）。処理自体はサーバー側で完了している場合があるので、履歴を確認してから再処理してください。";
       }
       setError("処理エラー: " + msg);
     }
+    releaseWakeLock();
     setProcessingId(null);
     processingRef.current.delete(rec.localId);
   };
