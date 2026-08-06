@@ -1687,6 +1687,7 @@ function HomeScreen({
 }) {
   const [recState, setRecState] = useState("idle");
   const [timer, setTimer] = useState(0);
+  const [longRecWarned, setLongRecWarned] = useState(false);
   const [stream, setStream] = useState(null);
   const [recs, setRecs] = useState([]);
   const [processingId, setProcessingId] = useState(null);
@@ -1756,6 +1757,14 @@ function HomeScreen({
     if (recState === "recording") timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);else clearInterval(timerRef.current);
     return () => clearInterval(timerRef.current);
   }, [recState]);
+  // 長時間録音への簡易警告（分割処理は未実装のため、処理が失敗しやすくなる前に
+  // ユーザー自身に区切ってもらうための注意喚起）。録音を止めることはしない。
+  const LONG_RECORDING_WARN_SEC = 60 * 60;
+  useEffect(() => {
+    if (recState === "recording" && !longRecWarned && timer >= LONG_RECORDING_WARN_SEC) {
+      setLongRecWarned(true);
+    }
+  }, [timer, recState, longRecWarned]);
   const isActive = recState === "recording" || recState === "paused";
   const wakeLockRef = useRef(null);
   const wantWakeLockRef = useRef(false);
@@ -1836,6 +1845,7 @@ function HomeScreen({
       setStream(s);
       setRecState("recording");
       setTimer(0);
+      setLongRecWarned(false);
       savedTimer.current = 0;
       if (onRecordingChange) onRecordingChange(true);
       wantWakeLockRef.current = true;
@@ -2605,7 +2615,15 @@ function HomeScreen({
       marginTop: 4,
       padding: "0 20px"
     }
-  }, "⚠️ この端末は自動画面ロック防止に非対応です。録音中は画面を手動でつけたままにしてください。"), recState === "idle" && /*#__PURE__*/React.createElement("div", {
+  }, "⚠️ この端末は自動画面ロック防止に非対応です。録音中は画面を手動でつけたままにしてください。"), recState === "recording" && longRecWarned && /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      fontSize: 10,
+      color: C.orange,
+      marginTop: 4,
+      padding: "0 20px"
+    }
+  }, "⚠️ 60分を超える長い録音になっています。AI処理に時間がかかったり失敗しやすくなるため、区切りの良いところで一度停止し、続きは新しい録音として分けることをおすすめします。"), recState === "idle" && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
