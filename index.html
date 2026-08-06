@@ -1911,6 +1911,13 @@ function HomeScreen({
     // Sheets側に重複行ができてしまうため。
     if (autoProcess) savePromise.finally(() => processRec(newRec));
   };
+  // GAS側の処理は非同期化されており、transcribeは音声を保存して"queued"を
+  // 返すだけになった。実際のAI処理はGAS側のトリガーで進むため、ここでは
+  // getRecordStatusを定期的にポーリングして完了/失敗を待つ。
+  // （録音が長い・複数人が同時に使うほど、1回の接続を長時間張りっぱなしにする
+  //   従来方式はiOS Safariの通信断やGASの実行時間上限に弱かったための変更）
+  const POLL_INTERVAL_MS = 8000;
+  const POLL_MAX_ATTEMPTS = 120; // 8秒 x 120 = 最大16分待つ
   const processRec = async rec => {
     if (processingRef.current.has(rec.localId)) return;
     processingRef.current.add(rec.localId);
@@ -1924,6 +1931,64 @@ function HomeScreen({
     // まだ解放していない場合もあるが、手動処理や再取得のケースに備えて確実に取得する）。
     wantWakeLockRef.current = true;
     await requestWakeLock();
+    const finish = () => {
+      releaseWakeLock();
+      setProcessingId(null);
+      processingRef.current.delete(rec.localId);
+    };
+    const applyDone = (finalId, sections) => {
+      setRecs(prev => prev.map(r => r.localId === rec.localId ? {
+        ...r,
+        processed: true,
+        sections,
+        id: finalId
+      } : r));
+      idbDelete(rec.localId);
+      if (onRecordSaved) onRecordSaved({
+        id: finalId,
+        date: rec.date,
+        duration: rec.duration,
+        member: rec.member,
+        interviewee: rec.interviewee,
+        mode: "interview",
+        sections
+      });
+    };
+    const pollStatus = async (id, attempt) => {
+      if (!processingRef.current.has(rec.localId)) return; // 途中で削除等された
+      if (attempt > POLL_MAX_ATTEMPTS) {
+        setError("処理状況の確認がタイムアウトしました。履歴を確認してください。");
+        finish();
+        return;
+      }
+      let data;
+      try {
+        data = await gasGet({
+          action: "getRecordStatus",
+          id
+        }, 15000);
+      } catch (e) {
+        // ポーリング自体の一時的な通信失敗はリトライする（致命的エラーにしない）
+        setTimeout(() => pollStatus(id, attempt + 1), POLL_INTERVAL_MS);
+        return;
+      }
+      if (!data.found) {
+        setError("処理中の記録が見つかりませんでした。履歴を確認してください。");
+        finish();
+        return;
+      }
+      if (data.status === "done") {
+        applyDone(id, data.sections);
+        finish();
+        return;
+      }
+      if (data.status === "error") {
+        setError("AI処理に失敗しました: " + (data.error || "不明なエラー"));
+        finish();
+        return;
+      }
+      setTimeout(() => pollStatus(id, attempt + 1), POLL_INTERVAL_MS);
+    };
     try {
       const mimeType = rec.mimeType || "audio/mp4";
       const blob = new Blob(rec.chunks, {
@@ -1936,9 +2001,7 @@ function HomeScreen({
       if (blob.size > 25 * 1024 * 1024) {
         const ok = window.confirm(`音声ファイルが${fileSizeMB}MBと大きいです。処理に時間がかかる場合があります。続行しますか？`);
         if (!ok) {
-          releaseWakeLock();
-          setProcessingId(null);
-          processingRef.current.delete(rec.localId);
+          finish();
           return;
         }
       }
@@ -1966,36 +2029,25 @@ function HomeScreen({
         mode: "interview",
         systemPrompt: SYSTEM_PROMPT,
         existingId: recId || null
-      }, 300000);
-      if (!data.success || data.error) throw new Error(data.error || "GASエラー");
-      if (!data.sections) throw new Error("AI要約データが返りませんでした");
+      }, 60000);
+      if (!data.success) throw new Error(data.error || "GASエラー");
       const finalId = data.id || recId;
-      setRecs(prev => prev.map(r => r.localId === rec.localId ? {
-        ...r,
-        processed: true,
-        sections: data.sections,
-        id: finalId
-      } : r));
-      idbDelete(rec.localId);
-      if (onRecordSaved) onRecordSaved({
-        id: finalId,
-        date: rec.date,
-        duration: rec.duration,
-        member: rec.member,
-        interviewee: rec.interviewee,
-        mode: "interview",
-        sections: data.sections
-      });
+      if (data.status === "done" && data.sections) {
+        // 念のための互換パス：同期的に結果が返ってきた場合はそのまま反映
+        applyDone(finalId, data.sections);
+        finish();
+        return;
+      }
+      // GAS側で非同期キューに登録済み。ポーリングで完了を待つ。
+      setTimeout(() => pollStatus(finalId, 1), 3000);
     } catch (e) {
       let msg = e.message || "不明なエラー";
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Load failed")) {
-        msg = "通信が切断されました（AI処理中に画面がロックされた可能性があります）。処理自体はサーバー側で完了している場合があるので、履歴を確認してから再処理してください。";
+        msg = "通信が切断されました。音声の保存自体は完了している場合があるので、しばらくしてから履歴を確認してください。";
       }
       setError("処理エラー: " + msg);
+      finish();
     }
-    releaseWakeLock();
-    setProcessingId(null);
-    processingRef.current.delete(rec.localId);
   };
   const deleteRec = id => {
     setRecs(prev => prev.filter(r => r.localId !== id));
