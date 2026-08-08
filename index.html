@@ -1682,8 +1682,7 @@ function HomeScreen({
   isOnline,
   onRecordSaved,
   onRecordingChange,
-  currentUser,
-  resetKey
+  currentUser
 }) {
   const [recState, setRecState] = useState("idle");
   const [timer, setTimer] = useState(0);
@@ -1752,7 +1751,7 @@ function HomeScreen({
         sections: normalizeSections(d.records[0].sections)
       });
     }).catch(() => {});
-  }, [member, resetKey]);
+  }, [member]);
   useEffect(() => {
     if (recState === "recording") timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);else clearInterval(timerRef.current);
     return () => clearInterval(timerRef.current);
@@ -1954,6 +1953,16 @@ function HomeScreen({
         id: finalId
       } : r));
       idbDelete(rec.localId);
+      // 「最近の記録」カードはmember変更時にしか再取得しないため、成功時は
+      // ここで直接更新しておく（以前はホーム再訪時の強制再マウントに頼っていた）。
+      setRecentRec({
+        id: finalId,
+        date: rec.date,
+        duration: rec.duration,
+        member: rec.member,
+        interviewee: rec.interviewee,
+        sections
+      });
       if (onRecordSaved) onRecordSaved({
         id: finalId,
         date: rec.date,
@@ -3138,7 +3147,6 @@ function App() {
   const [member, setMember] = useState("");
   const [interviewee, setInterviewee] = useState("");
   const [newRecord, setNewRecord] = useState(null);
-  const [resetKey, setResetKey] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   useEffect(() => {
     if (authed && currentUser?.name) setMember(currentUser.name);
@@ -3187,7 +3195,10 @@ function App() {
   const handleNav = k => {
     setScreen(k === "home" ? "home" : "history");
     if (k === "home") {
-      setResetKey(n => n + 1);
+      // 以前はここでHomeScreenを強制再マウントしていたが、それだと録音直後や
+      // AI処理失敗直後の未処理録音一覧（recs）がその場で消え、IndexedDBからの
+      // 復元に賭ける形になってしまっていた。ホームへの往復では画面の状態を
+      // そのまま保持し、余計なリセットはしない。
       setMember(currentUser?.name || "");
       setInterviewee("");
     }
@@ -3314,7 +3325,6 @@ function App() {
       flexDirection: "column"
     }
   }, screen === "home" ? /*#__PURE__*/React.createElement(HomeScreen, {
-    key: resetKey,
     member: member,
     interviewee: interviewee,
     setInterviewee: setInterviewee,
@@ -3324,8 +3334,7 @@ function App() {
       _ts: Date.now()
     }),
     onRecordingChange: setIsRecording,
-    currentUser: currentUser,
-    resetKey: resetKey
+    currentUser: currentUser
   }) : /*#__PURE__*/React.createElement(HistoryScreen, {
     memberFilter: currentUser?.name || "",
     newRecord: newRecord
