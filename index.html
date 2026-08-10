@@ -1703,9 +1703,32 @@ function HomeScreen({
   const processingRef = useRef(new Set());
   const savedTimer = useRef(0),
     savedDate = useRef("");
+  // 録音を約3分ごとに区切ってアップロードし、録音中に文字起こしを進めておくための状態。
+  // segmentsRef: 確定済みの区切り（{index, blob, mimeType, uploaded}）を録音順に保持。
+  // rotatingRef: 区切りによる再起動なのか、本当の録音停止なのかをonstopに伝えるフラグ。
+  const CHUNK_DURATION_MS = 3 * 60 * 1000;
+  const segmentsRef = useRef([]);
+  const rotatingRef = useRef(false);
+  const chunkIndexRef = useRef(0);
+  const chunkRotationTimerRef = useRef(null);
+  // onstop等のコールバックは録音開始時点のクロージャで固定されるため、録音中に
+  // 変わりうる値（自動要約トグル・相手・メンバー名）はrefで最新値を追えるようにする。
+  const autoProcessRef = useRef(false);
+  const memberRef = useRef("");
+  const intervieweeRef = useRef("");
+  useEffect(() => {
+    autoProcessRef.current = autoProcess;
+  }, [autoProcess]);
+  useEffect(() => {
+    memberRef.current = member;
+  }, [member]);
+  useEffect(() => {
+    intervieweeRef.current = interviewee;
+  }, [interviewee]);
   const idbRecordFrom = rec => ({
     localId: rec.localId,
-    chunks: rec.chunks,
+    segments: rec.segments,
+    chunks: rec.chunks, // 互換: 分割前の旧形式データが残っている場合のみ使う
     mimeType: rec.mimeType,
     date: rec.date,
     duration: rec.duration,
@@ -1719,21 +1742,26 @@ function HomeScreen({
       if (!items.length) return;
       setRecs(prev => {
         const known = new Set(prev.map(r => r.localId));
-        const restored = items.filter(it => !known.has(it.localId)).map(it => ({
-          localId: it.localId,
-          url: URL.createObjectURL(new Blob(it.chunks, {
-            type: it.mimeType
-          })),
-          date: it.date,
-          duration: it.duration,
-          member: it.member,
-          interviewee: it.interviewee,
-          processed: false,
-          sections: null,
-          id: it.id || null,
-          mimeType: it.mimeType,
-          chunks: it.chunks
-        }));
+        const restored = items.filter(it => !known.has(it.localId)).map(it => {
+          const hasSegments = Array.isArray(it.segments) && it.segments.length > 0;
+          const blobs = hasSegments ? it.segments.map(sg => sg.blob) : it.chunks || [];
+          return {
+            localId: it.localId,
+            url: URL.createObjectURL(new Blob(blobs, {
+              type: it.mimeType
+            })),
+            date: it.date,
+            duration: it.duration,
+            member: it.member,
+            interviewee: it.interviewee,
+            processed: false,
+            sections: null,
+            id: it.id || null,
+            mimeType: it.mimeType,
+            segments: hasSegments ? it.segments : undefined,
+            chunks: hasSegments ? undefined : it.chunks
+          };
+        });
         return restored.length ? [...restored, ...prev] : prev;
       });
     });
@@ -1808,6 +1836,43 @@ function HomeScreen({
   useEffect(() => {
     recStateRef.current = recState;
   }, [recState]);
+  // 録音の1区切り（segment）をGASにアップロードする。録音中は裏で呼ばれ、
+  // 失敗しても録音自体は継続する（uploaded=falseのままなら停止時に再送する）。
+  const uploadSegment = async (parentId, seg, isLast) => {
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onerror = () => rej(new Error("音声データの読み込みに失敗しました"));
+        r.onloadend = () => {
+          if (typeof r.result !== "string") {
+            rej(new Error("音声データの読み込みに失敗しました"));
+            return;
+          }
+          res(r.result.split(",")[1]);
+        };
+        r.readAsDataURL(seg.blob);
+      });
+      const res = await gasPost({
+        action: "submitChunk",
+        parentId,
+        chunkIndex: seg.index,
+        isLast,
+        audio: b64,
+        mimeType: seg.mimeType,
+        member: memberRef.current || "",
+        interviewee: intervieweeRef.current || "",
+        date: savedDate.current,
+        duration: isLast ? fmt(savedTimer.current || timer) : undefined,
+        mode: "interview",
+        systemPrompt: SYSTEM_PROMPT
+      }, 60000);
+      if (res.success) seg.uploaded = true;
+      return res.success;
+    } catch (e) {
+      console.warn("[uploadSegment] 区切り" + seg.index + "の送信に失敗（停止時に再試行されます）:", e.message);
+      return false;
+    }
+  };
   const startRec = async () => {
     if (!isOnline) {
       setError("オフラインです。接続を確認してください。");
@@ -1831,16 +1896,81 @@ function HomeScreen({
       } : {
         audioBitsPerSecond: 32000
       };
-      const mr = new MediaRecorder(s, mrOpts);
-      chunksRef.current = [];
-      mr.ondataavailable = e => e.data.size > 0 && chunksRef.current.push(e.data);
-      mr.onstop = () => {
-        s.getTracks().forEach(t => t.stop());
-        setStream(null);
-        releaseWakeLock();
+      const parentId = window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
+      chunkIndexRef.current = 0;
+      segmentsRef.current = [];
+      rotatingRef.current = false;
+      savedDate.current = nowStr();
+
+      // 3分ごとにMediaRecorderを一度停止→即再開し、独立した区切り（segment）を作る。
+      // 区切りの瞬間に数十〜300ms程度のごく短い音声の欠落が発生するが、これは
+      // MediaRecorderが作るファイルの仕組み上避けられない（最初の断片にしか
+      // ヘッダ情報が入らないため、後から機械的に切り分けることはできない）。
+      const startSegment = () => {
+        const mr = new MediaRecorder(s, mrOpts);
+        chunksRef.current = [];
+        mr.ondataavailable = e => e.data.size > 0 && chunksRef.current.push(e.data);
+        mr.onstop = () => {
+          const actualMime = mr.mimeType || mime || "audio/mp4";
+          const segmentBlob = new Blob(chunksRef.current, {
+            type: actualMime
+          });
+          const wasRotating = rotatingRef.current;
+          const seg = {
+            index: chunkIndexRef.current,
+            blob: segmentBlob,
+            mimeType: actualMime,
+            uploaded: false
+          };
+          segmentsRef.current.push(seg);
+
+          if (wasRotating) {
+            uploadSegment(parentId, seg, false);
+            rotatingRef.current = false;
+            chunkIndexRef.current += 1;
+            startSegment();
+            return;
+          }
+
+          // 録音の本当の終了（区切りによる再起動ではない）
+          s.getTracks().forEach(t => t.stop());
+          setStream(null);
+          releaseWakeLock();
+
+          const allSegments = segmentsRef.current;
+          const combinedUrl = URL.createObjectURL(new Blob(allSegments.map(sg => sg.blob), {
+            type: actualMime
+          }));
+          const localId = Date.now();
+          const newRec = {
+            localId,
+            url: combinedUrl,
+            date: savedDate.current,
+            duration: fmt(savedTimer.current || timer),
+            member: memberRef.current || "",
+            interviewee: intervieweeRef.current || "",
+            processed: false,
+            sections: null,
+            id: parentId,
+            mimeType: actualMime,
+            segments: allSegments
+          };
+          setRecs(prev => [...prev, newRec]);
+          if (intervieweeRef.current) {
+            lsSaveSuggestion(intervieweeRef.current);
+            setSuggestions(lsGetSuggestions());
+          }
+          idbPut(idbRecordFrom(newRec));
+          uploadSegment(parentId, seg, true).then(() => {
+            idbPut(idbRecordFrom(newRec));
+            if (autoProcessRef.current) processRec(newRec);
+          });
+        };
+        mr.start(100);
+        mrRef.current = mr;
       };
-      mr.start(100);
-      mrRef.current = mr;
+      startSegment();
+
       setStream(s);
       setRecState("recording");
       setTimer(0);
@@ -1849,6 +1979,14 @@ function HomeScreen({
       if (onRecordingChange) onRecordingChange(true);
       wantWakeLockRef.current = true;
       await requestWakeLock(); // 画面ロック防止
+
+      clearInterval(chunkRotationTimerRef.current);
+      chunkRotationTimerRef.current = setInterval(() => {
+        if (mrRef.current && mrRef.current.state === "recording") {
+          rotatingRef.current = true;
+          mrRef.current.stop(); // onstopが即座に次の区切りを開始する
+        }
+      }, CHUNK_DURATION_MS);
     } catch (e) {
       const msgs = {
         NotAllowedError: "マイクへのアクセスを許可してください。",
@@ -1861,64 +1999,16 @@ function HomeScreen({
   };
   const stopRec = () => {
     savedTimer.current = timer;
-    savedDate.current = nowStr();
-    mrRef.current?.stop();
+    clearInterval(chunkRotationTimerRef.current);
     // 自動処理する場合はprocessRec側で解放するまでWake Lockを保持する
     // （ここで解放すると、AI処理待ちの間に画面がロックされ、処理中の通信が
     // iOS Safariに切断されてしまうことがあるため）。
     if (!autoProcess) releaseWakeLock();
-    const mimeType = mrRef.current?.mimeType || "audio/mp4";
-    const blob = new Blob(chunksRef.current, {
-      type: mimeType
-    });
-    const url = URL.createObjectURL(blob);
-    const localId = Date.now();
-    const newRec = {
-      localId,
-      url,
-      date: savedDate.current,
-      duration: fmt(savedTimer.current || timer),
-      member: member || "",
-      interviewee: interviewee || "",
-      processed: false,
-      sections: null,
-      id: null,
-      mimeType,
-      chunks: [...chunksRef.current]
-    };
-    setRecs(prev => [...prev, newRec]);
     setRecState("stopped");
     if (onRecordingChange) onRecordingChange(false);
-    if (interviewee) {
-      lsSaveSuggestion(interviewee);
-      setSuggestions(lsGetSuggestions());
-    }
-    // 録音本体をIndexedDBに先行保存（transcribe失敗・アプリ再起動時の保険）
-    idbPut(idbRecordFrom(newRec));
-    // 録音完了時点で基本情報を先行保存
-    const savePromise = gasPost({
-      action: "saveRecord",
-      member: member || "",
-      interviewee: interviewee || "",
-      duration: fmt(savedTimer.current || timer),
-      date: savedDate.current,
-      mode: "interview"
-    }).then(d => {
-      if (d.success && d.id) {
-        setRecs(prev => prev.map(r => r.localId === localId ? {
-          ...r,
-          id: d.id
-        } : r));
-        newRec.id = d.id;
-        idbPut(idbRecordFrom(newRec));
-      }
-    }).catch(e => {
-      setError("録音の保存に失敗しました: " + (e.message || "不明なエラー"));
-    });
-    // saveRecordの完了（成功/失敗いずれも）を待ってからprocessRecを呼ぶ。
-    // 固定タイマーだとGASが遅い場合にnewRec.idがまだnullのままtranscribeが走り、
-    // Sheets側に重複行ができてしまうため。
-    if (autoProcess) savePromise.finally(() => processRec(newRec));
+    // 実際の録音停止・レコード確定・アップロードはMediaRecorderのonstopで行う
+    // （最後の区切りのデータが確定するのを待つ必要があるため）。
+    mrRef.current?.stop();
   };
   // GAS側の処理は非同期化されており、transcribeは音声を保存して"queued"を
   // 返すだけになった。実際のAI処理はGAS側のトリガーで進むため、ここでは
@@ -1927,7 +2017,7 @@ function HomeScreen({
   //   従来方式はiOS Safariの通信断やGASの実行時間上限に弱かったための変更）
   const POLL_INTERVAL_MS = 5000;
   const POLL_MAX_ATTEMPTS = 192; // 5秒 x 192 = 最大16分待つ（間隔を詰めた分、回数を増やして同じ上限を維持）
-  const processRec = async rec => {
+  const processRec = async (rec, force = false) => {
     if (processingRef.current.has(rec.localId)) return;
     processingRef.current.add(rec.localId);
     if (!isOnline) {
@@ -2009,6 +2099,50 @@ function HomeScreen({
       setTimeout(() => pollStatus(id, attempt + 1), POLL_INTERVAL_MS);
     };
     try {
+      if (rec.segments && rec.segments.length) {
+        // 分割録音：まだアップロード確定していない区切りだけ（強制再試行時は
+        // 全部）送り直す。送信自体はgasPost内で3分割ごとの小さな音声なので、
+        // 旧方式にあったファイルサイズ上限チェックはここでは不要。
+        const total = rec.segments.length;
+        for (let i = 0; i < total; i++) {
+          const seg = rec.segments[i];
+          if (!force && seg.uploaded) continue;
+          const b64 = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onerror = () => rej(new Error("音声データの読み込みに失敗しました"));
+            r.onloadend = () => {
+              if (typeof r.result !== "string") {
+                rej(new Error("音声データの読み込みに失敗しました"));
+                return;
+              }
+              res(r.result.split(",")[1]);
+            };
+            r.readAsDataURL(seg.blob);
+          });
+          const isLast = i === total - 1;
+          const res = await gasPost({
+            action: "submitChunk",
+            parentId: rec.id,
+            chunkIndex: seg.index,
+            isLast,
+            audio: b64,
+            mimeType: seg.mimeType || rec.mimeType,
+            member: rec.member,
+            interviewee: rec.interviewee,
+            date: rec.date,
+            duration: isLast ? rec.duration : undefined,
+            mode: "interview",
+            systemPrompt: SYSTEM_PROMPT
+          }, 60000);
+          if (!res.success) throw new Error(res.error || "GASエラー");
+          seg.uploaded = true;
+        }
+        idbPut(idbRecordFrom(rec));
+        setTimeout(() => pollStatus(rec.id, 1), 1500);
+        return;
+      }
+
+      // 互換パス：分割前の旧形式（rec.chunks が単一の音声全体）が残っている場合のみ通る
       const mimeType = rec.mimeType || "audio/mp4";
       const blob = new Blob(rec.chunks, {
         type: mimeType
@@ -2331,7 +2465,7 @@ function HomeScreen({
       padding: "8px 14px 12px"
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => processRec(rec),
+    onClick: () => processRec(rec, true),
     disabled: processingId === rec.localId,
     style: {
       width: "100%",
